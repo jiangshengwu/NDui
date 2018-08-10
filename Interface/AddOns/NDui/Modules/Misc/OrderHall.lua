@@ -1,4 +1,5 @@
-local B, C, L, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 
 --[[
 	职业大厅图标，取代自带的信息条
@@ -31,8 +32,7 @@ hall:RegisterEvent("PLAYER_ENTERING_WORLD")
 hall:RegisterEvent("ADDON_LOADED")
 hall:SetScript("OnEvent", function(self, event, arg1)
 	if event == "ADDON_LOADED" and arg1 == "Blizzard_OrderHallUI" then
-		OrderHallCommandBar:Hide()
-		OrderHallCommandBar.Show = B.Dummy
+		B.HideObject(OrderHallCommandBar)
 		GarrisonLandingPageTutorialBox:SetClampedToScreen(true)
 		self:UnregisterEvent("ADDON_LOADED")
 	elseif event == "UNIT_AURA" or event == "PLAYER_ENTERING_WORLD" then
@@ -59,13 +59,13 @@ hall:SetScript("OnEnter", function(self)
 			GameTooltip:AddLine(" ")
 			blank = true
 		end
-		local name, count, limit, description, texture = unpack(self.Category[i])
+		local name, count, limit, description = unpack(self.Category[i])
 		GameTooltip:AddDoubleLine(name, count.."/"..limit, 1,1,1, 1,1,1)
 		if IsShiftKeyDown() then
 			GameTooltip:AddLine(description, .6,.8,1,true)
 		end
 	end
-	GameTooltip:AddDoubleLine(" ", "--------------", 1,1,1, .5,.5,.5)
+	GameTooltip:AddDoubleLine(" ", DB.LineString)
 	GameTooltip:AddDoubleLine(" ", L["Details by Shift"], 1,1,1, .6,.8,1)
 	GameTooltip:Show()
 

@@ -1,29 +1,17 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:RegisterModule("Settings")
-
--- Increase Chat History
-for i = 1, 50 do
-	if _G["ChatFrame"..i] and _G["ChatFrame"..i]:GetMaxLines() ~= 1024 then
-		_G["ChatFrame"..i]:SetMaxLines(1024)
-	end
-end
-hooksecurefunc("FCF_OpenTemporaryWindow", function()
-	local cf = FCF_GetCurrentChatFrame():GetName() or nil
-	if cf then
-		if (_G[cf]:GetMaxLines() ~= 1024) then
-			_G[cf]:SetMaxLines(1024)
-		end
-	end
-end)
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:RegisterModule("Settings")
 
 -- Addon Info
 print("|cff0080ff< NDui >|cff70C0F5----------------")
-print("|cff00ff00  LEG|c00ffff00 "..DB.Version.." ("..DB.Support..") |c0000ff00"..L["Version Info1"])
+print("|cff00ff00  "..DB.Support.."|c00ffff00 "..DB.Version.." |c0000ff00"..L["Version Info1"])
 print("|c0000ff00  "..L["Version Info2"].."|c00ffff00 /ndui |c0000ff00"..L["Version Info3"])
 print("|cff70C0F5------------------------")
 
 -- Tuitorial
 local function ForceDefaultSettings()
+	SetCVar("ActionButtonUseKeyDown", 1)
+	--SetCVar("SpellQueueWindow", 250)
 	SetCVar("autoLootDefault", 1)
 	SetCVar("alwaysCompareItems", 0)
 	SetCVar("useCompactPartyFrames", 1)
@@ -33,7 +21,6 @@ local function ForceDefaultSettings()
 	SetCVar("nameplateShowSelf", 0)
 	SetCVar("nameplateShowAll", 1)
 	SetCVar("nameplateMotion", 1)
-	--SetCVar("ShowClassColorInFriendlyNameplate", 1)
 	SetCVar("nameplateShowFriendlyNPCs", 0)
 	SetCVar("screenshotQuality", 10)
 	SetCVar("showTutorials", 0)
@@ -48,7 +35,7 @@ local function ForceDefaultSettings()
 	SetCVar("floatingCombatTextFloatMode", 1)
 	SetCVar("ffxGlow", 0)
 	SetCVar("autoQuestWatch", 1)
-	SetCVar("overrideArchive", 0)
+	--SetCVar("overrideArchive", 0)
 	SetCVar("WorldTextScale", 1.5)
 end
 
@@ -62,19 +49,20 @@ local function ForceRaidFrame()
 end
 
 local function ForceUIScale()
-	Advanced_UseUIScale:Hide()
-	Advanced_UIScaleSlider:Hide()
-	SetCVar("useUiScale", 1)
-	local scale = NDuiDB["Settings"]["SetScale"]
+	B.HideOption(Advanced_UseUIScale)
+	B.HideOption(Advanced_UIScaleSlider)
+
+	local scale = NDuiDB["Settings"]["UIScale"]
 	if NDuiDB["Settings"]["LockUIScale"] then
-		if GetCurrentResolution() ~= 0 then
-			scale = .8*768/string.match(({GetScreenResolutions()})[GetCurrentResolution()], "%d+x(%d+)")
-		end
-		if scale < .5 then scale = .5 end
-		NDuiDB["Settings"]["SetScale"] = scale
+		scale = 768/DB.ScreenHeight * .8
+		local minScale = .64
+		if DB.ScreenHeight > 1080 then minScale = .5 end
+		if scale < minScale then scale = minScale end
+		NDuiDB["Settings"]["UIScale"] = scale
 	end
 
-	if scale < .65 then
+	SetCVar("useUiScale", 1)
+	if scale < .64 then
 		UIParent:SetScale(scale)
 	else
 		SetCVar("uiScale", scale)
@@ -88,13 +76,11 @@ local function ForceUIScale()
 		end
 	end
 
-	NDui:EventFrame("UI_SCALE_CHANGED"):SetScript("OnEvent", function()
-		if scale < .65 then
-			RestoreUIScale(scale)
-		end
+	B:RegisterEvent("UI_SCALE_CHANGED", function()
+		if scale < .64 then RestoreUIScale(scale) end
 
 		C_Timer.After(1, function()
-			if scale < .65 and UIParent:GetScale() ~= scale then
+			if scale < .64 and UIParent:GetScale() ~= scale then
 				RestoreUIScale(scale)
 			end
 		end)
@@ -108,20 +94,13 @@ local function ForceChatSettings()
 	ChatFrame1:SetWidth(380)
 	ChatFrame1:SetHeight(190)
     ChatFrame1:SetUserPlaced(true)
-	for i = 1, 10 do
+	for i = 1, NUM_CHAT_WINDOWS do
 		local cf = _G["ChatFrame"..i]
-		FCF_SetWindowAlpha(cf, 0)
-		ChatFrame_RemoveMessageGroup(cf,"CHANNEL")
-	end
-	local channels = {"SAY","EMOTE","YELL","GUILD","OFFICER","GUILD_ACHIEVEMENT","ACHIEVEMENT",
-	"WHISPER","PARTY","PARTY_LEADER","RAID","RAID_LEADER","RAID_WARNING","INSTANCE_CHAT",
-	"INSTANCE_CHAT_LEADER","CHANNEL1","CHANNEL2","CHANNEL3","CHANNEL4","CHANNEL5","CHANNEL6","CHANNEL7",
-	}	
-	for i, v in ipairs(channels) do
-		ToggleChatColorNamesByClassGroup(true, v)
+		ChatFrame_RemoveMessageGroup(cf, "CHANNEL")
 	end
 	FCF_SavePositionAndDimensions(ChatFrame1)
 	FCF_SetLocked(ChatFrame1, true)
+
 	NDuiDB["Chat"]["Lock"] = true
 end
 
@@ -198,7 +177,7 @@ local function ForceSkadaOptions()
 						["classicons"] = false,
 						["barslocked"] = true,
 						["y"] = 24,
-						["x"] = -5,
+						["x"] = -3,
 						["title"] = {
 							["color"] = {
 								["a"] = 0.3,
@@ -258,7 +237,7 @@ local function ForceBigwigs()
 						["outline"] = "OUTLINE",
 						["fontSize"] = 12,
 						["BigWigsAnchor_y"] = 336,
-						["BigWigsAnchor_x"] = 20,
+						["BigWigsAnchor_x"] = 16,
 						["BigWigsAnchor_width"] = 175,
 						["growup"] = true, 
 						["interceptMouse"] = false,
@@ -269,7 +248,7 @@ local function ForceBigwigs()
 						["font"] = DB.Font[1],
 						["onlyInterceptOnKeypress"] = true,
 						["emphasizeScale"] = 1,
-						["BigWigsEmphasizeAnchor_x"] = 836,
+						["BigWigsEmphasizeAnchor_x"] = 810,
 						["BigWigsEmphasizeAnchor_y"] = 350,
 						["BigWigsEmphasizeAnchor_width"] = 220,
 						["emphasizeGrowup"] = true,
@@ -394,6 +373,7 @@ local function YesTutor()
 		elseif currentPage == 2 then
 			NDuiDB["Settings"]["LockUIScale"] = true
 			ForceUIScale()
+			NDuiDB["Settings"]["LockUIScale"] = false
 			UIErrorsFrame:AddMessage(DB.InfoColor..L["UIScale Check"])
 		elseif currentPage == 3 then
 			ForceChatSettings()
@@ -444,12 +424,10 @@ local function HelloWorld()
 
 	local c1, c2 = "|c00FFFF00", "|c0000FF00"
 	local lines = {
-		c1.." /aw "..c2..L["Help Info4"],
 		c1.." /ww "..c2..L["Help Info12"],
 		c1.." /hb "..c2..L["Help Info5"],
 		c1.." /mm "..c2..L["Help Info6"],
 		c1.." /rl "..c2..L["Help Info7"],
-		c1.." /arc "..c2..L["Help Info8"],
 		c1.." /kro "..c2..L["Help Info13"],
 		c1.." /ncl "..c2..L["Help Info9"],
 	}

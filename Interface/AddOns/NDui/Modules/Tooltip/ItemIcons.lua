@@ -1,4 +1,5 @@
-local B, C, L, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 
 local newString = "0:0:64:64:5:59:5:59"
 
@@ -12,7 +13,7 @@ end
 local function newTooltipHooker(method, func)
 	return function(tooltip)
 		local modified = false
-		tooltip:HookScript("OnTooltipCleared", function(self, ...)
+		tooltip:HookScript("OnTooltipCleared", function()
 			modified = false
 		end)
 		tooltip:HookScript(method, function(self, ...)
@@ -24,15 +25,15 @@ local function newTooltipHooker(method, func)
 	end
 end
 
-local hookItem = newTooltipHooker("OnTooltipSetItem", function(self, ...)
-	local name, link = self:GetItem()
+local hookItem = newTooltipHooker("OnTooltipSetItem", function(self)
+	local _, link = self:GetItem()
 	if link then
 		setTooltipIcon(self, GetItemIcon(link))
 	end
 end)
 
-local hookSpell = newTooltipHooker("OnTooltipSetSpell", function(self, ...)
-	local name, rank, id = self:GetSpell()
+local hookSpell = newTooltipHooker("OnTooltipSetSpell", function(self)
+	local _, _, id = self:GetSpell()
 	if id then
 		setTooltipIcon(self, GetSpellTexture(id))
 	end
@@ -43,20 +44,16 @@ for _, tooltip in pairs{GameTooltip, ItemRefTooltip} do
 	hookSpell(tooltip)
 end
 
--- WorldQuest Tooltip
-hooksecurefunc("EmbeddedItemTooltip_SetItemByQuestReward", function(self)
-	if self.Icon then
-		self.Icon:SetTexCoord(unpack(DB.TexCoord))
-		self.IconBorder:Hide()
-	end
-end)
-_G.BONUS_OBJECTIVE_REWARD_WITH_COUNT_FORMAT = "|T%1$s:16:16:"..newString.."|t |cffffffff%2$d|r %3$s"
+-- Tooltip rewards icon
+_G.BONUS_OBJECTIVE_REWARD_WITH_COUNT_FORMAT = "|T%1$s:16:16:"..newString.."|t |cffffffff%2$s|r %3$s"
 _G.BONUS_OBJECTIVE_REWARD_FORMAT = "|T%1$s:16:16:"..newString.."|t %2$s"
 
--- PVPReward Tooltip
-hooksecurefunc("EmbeddedItemTooltip_SetItemByID", function(self)
-	if self.Icon then
+local function ReskinRewardIcon(self)
+	if self and self.Icon then
 		self.Icon:SetTexCoord(unpack(DB.TexCoord))
 		self.IconBorder:Hide()
 	end
-end)
+end
+hooksecurefunc("EmbeddedItemTooltip_SetItemByQuestReward", ReskinRewardIcon)
+hooksecurefunc("EmbeddedItemTooltip_SetItemByID", ReskinRewardIcon)
+hooksecurefunc("QuestUtils_AddQuestCurrencyRewardsToTooltip", function(_, _, self) ReskinRewardIcon(self) end)

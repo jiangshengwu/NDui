@@ -1,22 +1,18 @@
-local B, C, L, DB = unpack(select(2, ...))
-local Bar = NDui:GetModule("Actionbar")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local Bar = B:GetModule("Actionbar")
 local cfg = C.bars.bar2
-local padding, margin = 2, 2
 
 function Bar:CreateBar2()
+	local padding, margin = 2, 2
 	local num = NUM_ACTIONBAR_BUTTONS
 	local buttonList = {}
-	local layout = NDuiDB["Actionbar"]["Style"]
 
 	--create the frame to hold the buttons
 	local frame = CreateFrame("Frame", "NDui_ActionBar2", UIParent, "SecureHandlerStateTemplate")
 	frame:SetWidth(num*cfg.size + (num-1)*margin + 2*padding)
 	frame:SetHeight(cfg.size + 2*padding)
-	if layout == 5 then
-		frame.Pos = {"BOTTOM", UIParent, "BOTTOM", -108, 60}
-	else
-		frame.Pos = {"BOTTOM", UIParent, "BOTTOM", 0, 60}
-	end
+	frame.Pos = {"BOTTOM", UIParent, "BOTTOM", 0, 60}
 	frame:SetScale(cfg.scale)
 
 	--move the buttons into position and reparent them
@@ -47,6 +43,6 @@ function Bar:CreateBar2()
 
 	--create the mouseover functionality
 	if cfg.fader then
-		NDui.CreateButtonFrameFader(frame, buttonList, cfg.fader)
+		B.CreateButtonFrameFader(frame, buttonList, cfg.fader)
 	end
 end

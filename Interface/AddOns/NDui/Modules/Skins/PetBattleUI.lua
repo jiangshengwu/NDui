@@ -1,5 +1,6 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Skins")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Skins")
 
 function module:PetBattleUI()
 	if not NDuiDB["Skins"]["PetBattle"] then return end
@@ -150,7 +151,8 @@ function module:PetBattleUI()
 		end
 		if self.glow then self.glow:Hide() end
 		if self.Icon.Shadow then
-			local color = BAG_ITEM_QUALITY_COLORS[C_PetBattles.GetBreedQuality(self.petOwner, self.petIndex) - 1]
+			local quality = C_PetBattles.GetBreedQuality(self.petOwner, self.petIndex) - 1 or 1
+			local color = BAG_ITEM_QUALITY_COLORS[quality]
 			self.Icon.Shadow:SetBackdropBorderColor(color.r, color.g, color.b)
 		end
 	end)
@@ -169,7 +171,7 @@ function module:PetBattleUI()
 
 		local nextFrame = 1
 		for i = 1, C_PetBattles.GetNumAuras(self.petOwner, self.petIndex) do
-			local _, _, turnsRemaining, isBuff = C_PetBattles.GetAuraInfo(self.petOwner, self.petIndex, i)
+			local _, _, _, isBuff = C_PetBattles.GetAuraInfo(self.petOwner, self.petIndex, i)
 			if (isBuff and self.displayBuffs) or (not isBuff and self.displayDebuffs) then
 				local frame = self.frames[nextFrame]
 				frame.DebuffBorder:Hide()
@@ -228,7 +230,7 @@ function module:PetBattleUI()
 			bu.Icon:SetTexCoord(unpack(DB.TexCoord))
 			bu:SetNormalTexture("")
 			bu:GetPushedTexture():SetTexture(DB.textures.pushed)
-			bu:GetHighlightTexture():SetColorTexture(1, 1, 1, .3)
+			bu:GetHighlightTexture():SetColorTexture(1, 1, 1, .25)
 			B.CreateSD(bu, 3, 3)
 
 			bu.Cooldown:SetFont(DB.Font[1], 26, "OUTLINE")

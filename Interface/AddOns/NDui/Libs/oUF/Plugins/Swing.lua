@@ -3,7 +3,7 @@
 -- NDui MOD
 -------------------------
 local _, ns = ...
-local oUF = oUF or ns.oUF
+local oUF = ns.oUF or oUF
 
 local meleeing
 local rangeing
@@ -95,7 +95,7 @@ do
 	end
 end
 
-local MeleeChange = function(self, event, unit)
+local MeleeChange = function(self, _, unit)
 	if unit ~= "player" then return end
 	if not meleeing then return end
 
@@ -151,14 +151,14 @@ local MeleeChange = function(self, event, unit)
 		OffhandID = NewOffhandID
 	else
 		if ohspeed then
-			if swingMH.speed ~= mhspeed then
+			if swingMH.speed and swingMH.speed ~= mhspeed then
 				local percentage = ((swingMH.max or 10) - now) / (swingMH.speed)
 				swingMH.min = now - mhspeed * (1 - percentage)
 				swingMH.max = now + mhspeed * percentage
 				swingMH:SetMinMaxValues(swingMH.min, swingMH.max)
 				swingMH.speed = mhspeed
 			end
-			if swingOH.speed ~= ohspeed then
+			if swingOH.speed and swingOH.speed ~= ohspeed then
 				local percentage = ((swingOH.max or 10)- now) / (swingOH.speed)
 				swingOH.min = now - ohspeed * (1 - percentage)
 				swingOH.max = now + ohspeed * percentage
@@ -166,7 +166,7 @@ local MeleeChange = function(self, event, unit)
 				swingOH.speed = ohspeed
 			end
 		else
-			if swing.speed ~= mhspeed then
+			if swing.max and swing.speed ~= mhspeed then
 				local percentage = (swing.max - now) / (swing.speed)
 				swing.min = now - mhspeed * (1 - percentage)
 				swing.max = now + mhspeed * percentage
@@ -177,7 +177,7 @@ local MeleeChange = function(self, event, unit)
 	end
 end
 
-local RangedChange = function(self, event, unit)
+local RangedChange = function(self, _, unit)
 	if unit ~= "player" then return end
 	if not rangeing then return end
 
@@ -205,9 +205,10 @@ local RangedChange = function(self, event, unit)
 	end
 end
 
-local Ranged = function(self, event, unit, spellName)
+local Ranged = function(self, _, unit, _, spellID)
 	if unit ~= "player" then return end
-	if spellName ~= GetSpellInfo(75) and spellName ~= GetSpellInfo(5019) then return end
+	--if spellName ~= rangeText1 and spellName ~= rangeText2 then return end
+	if spellID ~= 75 and spellID ~= 5019 then return end
 
 	local bar = self.Swing
 	local swing = bar.Twohand
@@ -231,7 +232,8 @@ local Ranged = function(self, event, unit, spellName)
 	swingOH:SetScript("OnUpdate", nil)
 end
 
-local Melee = function(self, event, _, subevent, _, GUID)
+local Melee = function(self)
+	local _, subevent, _, GUID = CombatLogGetCurrentEventInfo()
 	if GUID ~= UnitGUID("player") then return end
 	if not string.find(subevent, "SWING") then return end
 
@@ -285,10 +287,8 @@ local Melee = function(self, event, _, subevent, _, GUID)
 	lasthit = GetTime()
 end
 
-local ParryHaste = function(self, event, _, subevent, ...)
-	local tarGUID, missType
-	tarGUID = select(7, ...)
-	missType = select(9, ...)
+local ParryHaste = function(self)
+	local _, subevent, _, _, _, _, tarGUID, _, missType = CombatLogGetCurrentEventInfo()
 
 	if tarGUID ~= UnitGUID("player") then return end
 	if not meleeing then return end

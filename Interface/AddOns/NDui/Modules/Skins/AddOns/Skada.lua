@@ -1,5 +1,6 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Skins")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Skins")
 
 function module:SkadaSkin()
 	if not NDuiDB["Skins"]["Skada"] then return end
@@ -26,7 +27,7 @@ function module:SkadaSkin()
 		StripOptions(options)
 	end
 
-	for k, options in pairs(Skada.options.args.windows.args) do
+	for _, options in pairs(Skada.options.args.windows.args) do
 		if options.type == "group" then
 			StripOptions(options.args)
 		end
@@ -44,7 +45,6 @@ function module:SkadaSkin()
 		skada.SetFrameLevel = B.Dummy
 		skada:SetBackdrop(nil)
 
-		local color = win.db.title.color
 		win.bargroup.button:SetBackdropColor(1, 1, 1, 0)
 
 		if not skada.shadow then
@@ -54,10 +54,10 @@ function module:SkadaSkin()
 			B.CreateBD(skada.shadow, .5, 3)
 			B.CreateTex(skada.shadow)
 
-			local Cskada = B.CreateButton(skada, 20, 100, ">", 18)
+			local Cskada = B.CreateButton(skada, 20, 80, ">", 18)
 			Cskada:SetPoint("RIGHT", skada, "LEFT", 0, 0)
 			B.CreateTex(Cskada)
-			local Oskada = B.CreateButton(UIParent, 20, 100, "<", 18)
+			local Oskada = B.CreateButton(UIParent, 20, 80, "<", 18)
 			Oskada:Hide()
 			Oskada:SetPoint("RIGHT", skada, "RIGHT", 5, 0)
 			B.CreateTex(Oskada)
@@ -101,8 +101,8 @@ function module:SkadaSkin()
 		if #windows == 1 then
 			EmbedWindow(windows[1], 320, 18, 198, "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -3, 26)
 		elseif #windows == 2 then
-			EmbedWindow(windows[1], 320, 18, 127,  "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -3, 159)
-			EmbedWindow(windows[2], 320, 18, 127,  "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -3, 26)
+			EmbedWindow(windows[1], 320, 18, 109,  "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -3, 141)
+			EmbedWindow(windows[2], 320, 18, 109,  "BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -3, 26)
 		end
 	end
 
@@ -113,7 +113,7 @@ function module:SkadaSkin()
 	Skada.CreateWindow_ = Skada.CreateWindow
 	function Skada:CreateWindow(name, db)
 		Skada:CreateWindow_(name, db)
-		windows = {}
+		wipe(windows)
 		for _, window in ipairs(Skada:GetWindows()) do
 			tinsert(windows, window)
 		end
@@ -123,7 +123,7 @@ function module:SkadaSkin()
 	Skada.DeleteWindow_ = Skada.DeleteWindow
 	function Skada:DeleteWindow(name)
 		Skada:DeleteWindow_(name)
-		windows = {}
+		wipe(windows)
 		for _, window in ipairs(Skada:GetWindows()) do
 			tinsert(windows, window)
 		end
@@ -147,28 +147,6 @@ function module:SkadaSkin()
 	Skada.options.args.generaloptions.args.numberformat = nil
 
 	function Skada:FormatNumber(number)
-		if number then
-			if NDuiDB["Settings"]["Format"] == 1 then
-				if number >= 1e9 then
-					return ("%02.2fb"):format(number / 1e9)
-				elseif number > 1e6 then
-					return ("%02.2fm"):format(number / 1e6)
-				elseif number > 1e3 then
-					return ("%02.1fk"):format(number / 1e3)
-				else
-					return math.floor(number)
-				end
-			elseif NDuiDB["Settings"]["Format"] == 2 then
-				if number > 1e8 then
-					return ("%02.2f"..L["NumberCap2"]):format(number / 1e8)
-				elseif number > 1e4 then
-					return ("%02.1f"..L["NumberCap1"]):format(number / 1e4)
-				else
-					return math.floor(number)
-				end
-			else
-				return math.floor(number)
-			end
-		end
+		if number then return B.Numb(number) end
 	end
 end

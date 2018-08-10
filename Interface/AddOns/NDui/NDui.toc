@@ -1,17 +1,18 @@
-## Interface: 70300
+## Interface: 80000
 ## Title: |cff0080ffNDui|r
 ## X-Credits: Elv, Freebaser, Haleth, Haste, Leatrix, Lightspark, Loshine, Neavo, Paopao001, Qulight, Ray, Rubgrsch, Zork.
 ## Author: Siweia
-## Notes: NDui Core
-## Version: 2.8.6
-## X-Support: 7.3.5
+## Notes: More than an UI.
+## Version: 3.5.4
+## X-Support: BfA
+## X-Website: http://bbs.nga.cn/read.php?tid=5483616
 ## SavedVariables: NDuiADB
 ## SavedVariablesPerCharacter: NDuiDB
 
 Init.lua
 Locales\Locales.xml
-Config\Config.xml
 Core\Core.xml
+Config\Config.xml
 Libs\Libs.xml
 Modules\Modules.xml
 Plugins\Plugins.xml

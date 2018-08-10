@@ -1,11 +1,12 @@
 local _, ns = ...
-local cast = CreateFrame("Frame")
+local B, C, L, DB = unpack(ns)
 
+local cast = CreateFrame("Frame")
 local channelingTicks = {
 	-- warlock
-	[GetSpellInfo(755)] = 3, 		-- health funnel
-	[GetSpellInfo(198590)] = 6, 	-- drain soul
-	[GetSpellInfo(193439)] = 3, 	-- demon fury
+	[GetSpellInfo(755)] = 3,		-- health funnel
+	[GetSpellInfo(198590)] = 5,		-- drain soul
+	[GetSpellInfo(234153)] = 5,		-- drain life
 	-- druid
 	[GetSpellInfo(740)] = 4,		-- Tranquility
 	-- priest
@@ -19,27 +20,25 @@ local channelingTicks = {
 	[GetSpellInfo(205021)] = 12,
 }
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
-f:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
-f:SetScript("OnEvent", function(self)
-	self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-	local myclass, penance = select(2, UnitClass("player")), 3
-	if myclass == "PRIEST" and IsPlayerSpell(193134) then -- Enhanced Mind Flay
-		penance = 4
+if DB.MyClass == "PRIEST" then
+	local penance = GetSpellInfo(47540)
+	local function updateTicks()
+		local numTicks = 3
+		if IsPlayerSpell(193134) then numTicks = 4 end	-- Enhanced Mind Flay
+		channelingTicks[penance] = numTicks
 	end
-
-	channelingTicks[GetSpellInfo(47540)] = penance
-end)
+	B:RegisterEvent("PLAYER_LOGIN", updateTicks)
+	B:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED", updateTicks)
+end
 
 local ticks = {}
-cast.setBarTicks = function(castBar, ticknum)
+local function setBarTicks(castBar, ticknum)
 	if ticknum and ticknum > 0 then
 		local delta = castBar:GetWidth() / ticknum
 		for k = 1, ticknum do
 			if not ticks[k] then
 				ticks[k] = castBar:CreateTexture(nil, "OVERLAY")
-				ticks[k]:SetTexture("Interface\\Addons\\NDui\\Media\\normTex")
+				ticks[k]:SetTexture(DB.normTex)
 				ticks[k]:SetVertexColor(0, 0, 0, .7)
 				ticks[k]:SetWidth(1.2)
 				ticks[k]:SetHeight(castBar:GetHeight())
@@ -49,7 +48,7 @@ cast.setBarTicks = function(castBar, ticknum)
 			ticks[k]:Show()
 		end
 	else
-		for k, v in pairs(ticks) do
+		for _, v in pairs(ticks) do
 			v:Hide()
 		end
 	end
@@ -58,22 +57,20 @@ end
 cast.OnCastbarUpdate = function(self, elapsed)
 	if not self.Lag then self.Lag = 0 end
 	if GetNetStats() == 0 then return end
-	local currentTime = GetTime()
+
 	if self.casting or self.channeling then
-		local parent = self:GetParent()
-		local decimal
-		if parent.mystyle == "nameplate" then
-			decimal = "%.1f"
-		else
-			decimal = "%.2f"
-		end
+		local mystyle = self.__owner.mystyle
+		local decimal = "%.2f"
+		if mystyle == "nameplate" or mystyle == "boss" or mystyle == "arena" then decimal = "%.1f" end
+
 		local duration = self.casting and self.duration + elapsed or self.duration - elapsed
 		if (self.casting and duration >= self.max) or (self.channeling and duration <= 0) then
 			self.casting = nil
 			self.channeling = nil
 			return
 		end
-		if parent.unit == "player" then
+
+		if self.__owner.unit == "player" then
 			if self.delay ~= 0 then
 				self.Time:SetFormattedText(decimal.." | |cffff0000"..decimal, duration, self.casting and self.max + self.delay or self.max - self.delay)
 			else
@@ -102,16 +99,17 @@ cast.OnCastbarUpdate = function(self, elapsed)
 	end
 end
 
-cast.OnCastSent = function(self, event, unit, spell, rank)
+cast.OnCastSent = function(self)
 	if not self.Castbar.SafeZone then return end
 	self.Castbar.SafeZone.sendTime = GetTime()
 	self.Castbar.SafeZone.castSent = true
 end
 
-cast.PostCastStart = function(self, unit, name, castID, spellID)
-	self:SetAlpha(1.0)
+cast.PostCastStart = function(self, unit)
+	self:SetAlpha(1)
 	self.Spark:Show()
 	self:SetStatusBarColor(unpack(self.casting and self.CastingColor or self.ChannelingColor))
+
 	if unit == "vehicle" then 
 		self.SafeZone:Hide()
 		self.Lag:Hide()
@@ -119,8 +117,8 @@ cast.PostCastStart = function(self, unit, name, castID, spellID)
 		if GetNetStats() == 0 then return end
 		local sf = self.SafeZone
 		if not sf then return end
+
 		sf.timeDiff = 0
-		self.Lag:SetText("")
 		if sf.castSent == true then
 			sf.timeDiff = GetTime() - sf.sendTime
 			sf.timeDiff = sf.timeDiff > self.max and self.max or sf.timeDiff
@@ -128,23 +126,30 @@ cast.PostCastStart = function(self, unit, name, castID, spellID)
 			sf:Show()
 			sf.castSent = false
 		end
-		if not UnitInVehicle("player") then sf:Show() self.Lag:Show() else sf:Hide() self.Lag:Hide() end
+
+		self.Lag:SetText("")
+		if not UnitInVehicle("player") then
+			sf:Show()
+			self.Lag:Show()
+		else
+			sf:Hide()
+			self.Lag:Hide()
+		end
+
 		if self.casting then
-			cast.setBarTicks(self, 0)
+			setBarTicks(self, 0)
 		else
 			local spell = UnitChannelInfo(unit)
 			self.channelingTicks = channelingTicks[spell] or 0
-			cast.setBarTicks(self, self.channelingTicks)
+			setBarTicks(self, self.channelingTicks)
 		end
 	elseif not UnitIsUnit(unit, "player") and self.notInterruptible then
 		self:SetStatusBarColor(unpack(self.notInterruptibleColor))
 	end
 
 	-- Fix for empty icon
-	local texture = GetSpellTexture(spellID)
-	if not texture then
-		texture = 136243
-		if self.Icon then self.Icon:SetTexture(texture) end
+	if self.Icon and not self.Icon:GetTexture() then
+		self.Icon:SetTexture(136243)
 	end
 end
 
@@ -156,7 +161,7 @@ cast.PostUpdateInterruptible = function(self, unit)
 	end
 end
 
-cast.PostCastStop = function(self, unit, spellname, castID, spellID)
+cast.PostCastStop = function(self)
 	if not self.fadeOut then 
 		self:SetStatusBarColor(unpack(self.CompleteColor))
 		self.fadeOut = true
@@ -165,13 +170,13 @@ cast.PostCastStop = function(self, unit, spellname, castID, spellID)
 	self:Show()
 end
 
-cast.PostChannelStop = function(self, unit, name, spellID)
+cast.PostChannelStop = function(self)
 	self.fadeOut = true
 	self:SetValue(0)
 	self:Show()
 end
 
-cast.PostCastFailed = function(self, event, unit, name, castID, spellID)
+cast.PostCastFailed = function(self)
 	self:SetStatusBarColor(unpack(self.FailColor))
 	self:SetValue(self.max)
 	if not self.fadeOut then

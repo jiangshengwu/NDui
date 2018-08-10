@@ -1,5 +1,6 @@
-local B, C, L, DB = unpack(select(2, ...))
-local UF = NDui:GetModule("UnitFrames")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local UF = B:GetModule("UnitFrames")
 
 -- RaidFrame Elements
 function UF:CreateRaidIcons(self)
@@ -43,7 +44,7 @@ function UF:CreateTargetBorder(self)
 	self:RegisterEvent("GROUP_ROSTER_UPDATE", UpdateTargetBorder)
 end
 
-local function UpdateThreatBorder(self, event, unit)
+local function UpdateThreatBorder(self, _, unit)
 	if unit ~= self.unit then return end
 
 	local element = self.Health.Shadow
@@ -64,8 +65,9 @@ function UF:CreateThreatBorder(self)
 end
 
 function UF:CreateRaidDebuffs(self)
-	local bu = CreateFrame("Frame", nil, self)
 	local size = 18*NDuiDB["UFs"]["RaidScale"]
+
+	local bu = CreateFrame("Frame", nil, self)
 	bu:SetSize(size, size)
 	bu:SetPoint("TOPRIGHT", -10, -2)
 	bu:SetFrameLevel(self:GetFrameLevel() + 3)
@@ -78,7 +80,7 @@ function UF:CreateRaidDebuffs(self)
 	bu.time = B.CreateFS(bu, 12, "", false, "CENTER", 1, 0)
 
 	bu.ShowDispellableDebuff = true
-	bu.EnableTooltip = not NDuiDB["UFs"]["NoTooltip"]
+	bu.EnableTooltip = not NDuiDB["UFs"]["AurasClickThrough"]
 	bu.ShowDebuffBorder = NDuiDB["UFs"]["DebuffBorder"]
 	bu.FilterDispellableDebuff = NDuiDB["UFs"]["Dispellable"]
 	if NDuiDB["UFs"]["InstanceAuras"] then bu.Debuffs = C.RaidDebuffs end
@@ -115,7 +117,6 @@ local keyList = {
 local defaultSpellList = {
 	["DRUID"] = {
 		[2] = 88423,		-- 驱散
-		[3] = 50769,		-- 复活
 		[5] = 774,			-- 回春术
 		[6] = 33763,		-- 生命绽放
 	},
@@ -130,25 +131,21 @@ local defaultSpellList = {
 	},
 	["SHAMAN"] = {
 		[2] = 77130,		-- 驱散
-		[3] = 2008,			-- 复活
 		[5] = 61295,		-- 激流
 		[6] = 546,			-- 水上行走
 	},
 	["PALADIN"] = {
 		[2] = 4987,			-- 驱散
-		[3] = 7328,			-- 复活
-		[5] = 20476,		-- 神圣震击
+		[5] = 20473,		-- 神圣震击
 		[6] = 1022,			-- 保护祝福
 	},
 	["PRIEST"] = {
 		[2] = 527,			-- 驱散
-		[3] = 2006,			-- 复活
 		[5] = 17,			-- 真言术盾
 		[6] = 1706,			-- 漂浮术
 	},
 	["MONK"] = {
 		[2] = 115450,		-- 驱散
-		[3] = 115178,		-- 复活
 		[5] = 119611,		-- 复苏之雾
 	},
 	["MAGE"] = {
@@ -172,7 +169,7 @@ function UF:DefaultClickSets()
 	end
 end
 
-local function setupClickSets(self, ...)
+local function setupClickSets(self)
 	if InCombatLockdown() then return end
 
 	for _, data in pairs(NDuiDB["RaidClickSets"]) do
@@ -192,6 +189,9 @@ local function setupClickSets(self, ...)
 				elseif value == "follow" then
 					self:SetAttribute(format(v[3], "type"), "macro")
 					self:SetAttribute(format(v[3], "macrotext"), "/follow mouseover")
+				elseif value:match("/") then
+					self:SetAttribute(format(v[3], "type"), "macro")
+					self:SetAttribute(format(v[3], "macrotext"), value)
 				end
 				break
 			end
@@ -199,7 +199,7 @@ local function setupClickSets(self, ...)
 	end
 
 	self:RegisterForClicks("AnyDown")
-	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	self:UnregisterEvent("PLAYER_REGEN_ENABLED", setupClickSets)
 end
 
 function UF:CreateClickSets(self)

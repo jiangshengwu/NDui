@@ -2,8 +2,8 @@
 -- oUF_FloatingCombatFeedback, by lightspark
 -- NDui MOD
 -----------------------------------------------
-local B, C, L, DB = unpack(select(2, ...))
 local _, ns = ...
+local B, C, L, DB = unpack(ns)
 local oUF = ns.oUF or oUF
 assert(oUF, "oUF FloatingCombatFeedback was unable to locate oUF install")
 
@@ -143,14 +143,24 @@ local function getFloatingIconTexture(iconType, spellID, isPet)
 	return texture
 end
 
-local function Update(self, event, ...)
+local function formatNumber(self, amount)
+	local element = self.FloatingCombatFeedback
+
+	if element.abbreviateNumbers then
+		return B.Numb(amount)
+	else
+		return BreakUpLargeNumbers(amount)
+	end
+end
+
+local function Update(self, event)
 	local element = self.FloatingCombatFeedback
 	local multiplier = 1
 	local text, color, texture, critMark
 	local unit = self.unit
 
 	if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-		local _, eventType, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, spellID, spellName, school = ...
+		local _, eventType, _, sourceGUID, _, sourceFlags, _, destGUID, _, _, _, spellID, _, school = CombatLogGetCurrentEventInfo()
 		local isPlayer = UnitGUID("player") == sourceGUID
 		local atTarget = UnitGUID("target") == destGUID
 		local atPlayer = UnitGUID("player") == destGUID
@@ -165,9 +175,9 @@ local function Update(self, event, ...)
 				if value.autoAttack and not element.showAutoAttack then return end
 				if value.isPeriod and not element.showHots then return end
 
-				local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = select(value.index, ...)
+				local amount, _, _, _, _, _, critical, _, crushing = select(value.index, CombatLogGetCurrentEventInfo())
 				texture = getFloatingIconTexture(value.iconType, spellID, isPet)
-				text = "-"..(element.abbreviateNumbers and B.Numb(amount) or BreakUpLargeNumbers(amount))
+				text = "-"..formatNumber(self, amount)
 
 				if critical or crushing then
 					multiplier = 1.25
@@ -176,22 +186,28 @@ local function Update(self, event, ...)
 			elseif value.suffix == "HEAL" then
 				if value.isPeriod and not element.showHots then return end
 
-				local amount, overhealing, absorbed, critical = select(value.index, ...)
+				local amount, overhealing, _, critical = select(value.index, CombatLogGetCurrentEventInfo())
 				texture = getFloatingIconTexture(value.iconType, spellID)
-				text = "+"..(element.abbreviateNumbers and B.Numb(amount) or BreakUpLargeNumbers(amount))
+				local overhealText = ""
+				if overhealing > 0 then
+					amount = amount - overhealing
+					overhealText = " ("..formatNumber(self, overhealing)..")"
+				end
+				if amount == 0 and not element.showOverHealing then return end
+				text = "+"..formatNumber(self, amount)..overhealText
 
 				if critical then
 					multiplier = 1.25
 					critMark = true
 				end
 			elseif value.suffix == "MISS" then
-				local missType, isOffHand, amountMissed = select(value.index, ...)
+				local missType = select(value.index, CombatLogGetCurrentEventInfo())
 				texture = getFloatingIconTexture(value.iconType, spellID, isPet)
 				text = _G["COMBAT_TEXT_"..missType]
 			elseif value.suffix == "ENVIRONMENT" then
-				local envType, amount, overkill, school = select(value.index, ...)
+				local envType, amount = select(value.index, CombatLogGetCurrentEventInfo())
 				texture = getFloatingIconTexture(value.iconType, envType)
-				text = "-"..(element.abbreviateNumbers and B.Numb(amount) or BreakUpLargeNumbers(amount))
+				text = "-"..formatNumber(self, amount)
 			end
 
 			color = schoolColors[school] or schoolColors[0]

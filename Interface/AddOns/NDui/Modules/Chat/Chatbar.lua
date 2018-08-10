@@ -1,5 +1,6 @@
-﻿local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Chat")
+﻿local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Chat")
 
 function module:Chatbar()
 	local chatFrame = SELECTED_DOCK_FRAME
@@ -18,7 +19,7 @@ function module:Chatbar()
 		bu.Icon:SetVertexColor(r, g, b)
 		bu:SetHitRectInsets(0, 0, -8, -8)
 		bu:RegisterForClicks("AnyUp")
-		if text then B.CreateGT(bu, "ANCHOR_TOP", B.HexRGB(r, g, b)..text) end
+		if text then B.AddTooltip(bu, "ANCHOR_TOP", B.HexRGB(r, g, b)..text) end
 		if func then bu:SetScript("OnClick", func) end
 
 		tinsert(buttonList, bu)
@@ -27,21 +28,21 @@ function module:Chatbar()
 
 	-- Create Chatbars
 	local buttonInfo = {
-		{1, 1, 1, SAY.."/"..YELL, function(self, btn)
+		{1, 1, 1, SAY.."/"..YELL, function(_, btn)
 			if btn == "RightButton" then
 				ChatFrame_OpenChat("/y ", chatFrame)
 			else
 				ChatFrame_OpenChat("/s ", chatFrame)
 			end
 		end},
-		{1, .5, 1, WHISPER, function(self, btn)
+		{1, .5, 1, WHISPER, function(_, btn)
 			if btn == "RightButton" then   
 				ChatFrame_ReplyTell(chatFrame)
 				if not editBox:IsVisible() or editBox:GetAttribute("chatType") ~= "WHISPER" then
 					ChatFrame_OpenChat("/w ", chatFrame)
 				end
 			else   
-				if(UnitExists("target") and UnitName("target") and UnitIsPlayer("target") and GetDefaultLanguage("player") == GetDefaultLanguage("target") )then
+				if UnitExists("target") and UnitName("target") and UnitIsPlayer("target") and GetDefaultLanguage("player") == GetDefaultLanguage("target") then
 					local name = GetUnitName("target", true)
 					ChatFrame_OpenChat("/w "..name.." ", chatFrame)
 				else
@@ -50,14 +51,14 @@ function module:Chatbar()
 			end
 		end},
 		{.65, .65, 1, PARTY, function() ChatFrame_OpenChat("/p ", chatFrame) end},
-		{1, .5, 0, INSTANCE.."/"..RAID, function(self, btn)
+		{1, .5, 0, INSTANCE.."/"..RAID, function()
 			if IsPartyLFG() then
 				ChatFrame_OpenChat("/i ", chatFrame)
 			else
 				ChatFrame_OpenChat("/raid ", chatFrame)
 			end
 		end},
-		{.25, 1, .25, GUILD.."/"..OFFICER, function(self, btn)
+		{.25, 1, .25, GUILD.."/"..OFFICER, function(_, btn)
 			if btn == "RightButton" and CanEditOfficerNote() then
 				ChatFrame_OpenChat("/o ", chatFrame)
 			else
@@ -78,12 +79,12 @@ function module:Chatbar()
 	combat:SetAttribute("macrotext", "/combatlog")
 
 	-- WORLD CHANNEL
-	if DB.Client == "zhCN" or DB.Client == "zhTW" then
-		local channelName, channelID = L["World Channel Name"]
+	if DB.Client == "zhCN" then
+		local channelName, channelID, channels = L["World Channel Name"]
 		local wc = AddButton(0, .8, 1, L["World Channel"])
 
-		local function IsInChannel()
-			local channels = {GetChannelList()}
+		local function isInChannel(event)
+			channels = {GetChannelList()}
 			for i = 1, #channels do
 				if channels[i] == channelName then
 					wc.inChannel = true
@@ -91,16 +92,21 @@ function module:Chatbar()
 					break
 				end
 			end
+
 			if wc.inChannel then
 				wc.Icon:SetVertexColor(0, .8, 1)
 			else
 				wc.Icon:SetVertexColor(1, .1, .1)
 			end
-		end
-		IsInChannel()
-		NDui:EventFrame("CHANNEL_UI_UPDATE"):SetScript("OnEvent", IsInChannel)
 
-		wc:SetScript("OnClick", function(self, btn)
+			if event == "PLAYER_ENTERING_WORLD" then
+				B:UnregisterEvent(event, isInChannel)
+			end
+		end
+		B:RegisterEvent("PLAYER_ENTERING_WORLD", isInChannel)
+		B:RegisterEvent("CHANNEL_UI_UPDATE", isInChannel)
+
+		wc:SetScript("OnClick", function(_, btn)
 			if wc.inChannel then
 				if btn == "RightButton" then
 					LeaveChannelByName(channelName)

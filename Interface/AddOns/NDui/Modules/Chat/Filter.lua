@@ -1,7 +1,9 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Chat")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Chat")
 
-NDui:EventFrame({"PLAYER_LOGIN", "PLAYER_LOGOUT"}):SetScript("OnEvent", function(self, event)
+-- Account-wide settings
+local function accountSettings(event)
 	if not NDuiADB["ChatFilter"] then NDuiADB["ChatFilter"] = "" end
 	if not NDuiADB["ChatAt"] then NDuiADB["ChatAt"] = "" end
 	if not NDuiADB["Timestamp"] then NDuiADB["Timestamp"] = false end
@@ -25,57 +27,67 @@ NDui:EventFrame({"PLAYER_LOGIN", "PLAYER_LOGOUT"}):SetScript("OnEvent", function
 			SetCVar("showTimestamps", "none")
 		end
 	end
-end)
+end
+B:RegisterEvent("PLAYER_LOGIN", accountSettings)
+B:RegisterEvent("PLAYER_LOGOUT", accountSettings)
 
 --[[
 	修改自NoGoldSeller，强迫症患者只能接受这个低占用的。
 ]]
+
+-- Filter Chat symbols
+local msgSymbols = {"`", "～", "＠", "＃", "^", "＊", "！", "？", "。", "|", " ", "—", "——", "￥", "’", "‘", "“", "”", "【", "】", "『", "』", "《", "》", "〈", "〉", "（", "）", "〔", "〕", "、", "，", "：", ",", "_", "/", "~", "%-", "%."}
+
 local FilterList = {}
 local function genFilterList()
-	local keywords = {string.split(" ", NDuiDB["Chat"]["FilterList"] or "")}
-	for _, value in pairs(keywords) do
-		if value ~= "" then
-			if not FilterList[value] then
-				FilterList[value] = true
+	FilterList = {string.split(" ", NDuiDB["Chat"]["FilterList"] or "")}
+end
+B.genFilterList = genFilterList
+
+local friendsList = {}
+local function updateFriends()
+	wipe(friendsList)
+
+	for i = 1, GetNumFriends() do
+		local name = GetFriendInfo(i)
+		if name then
+			friendsList[Ambiguate(name, "none")] = true
+		end
+	end
+
+	for i = 1, select(2, BNGetNumFriends()) do
+		for j = 1, BNGetNumFriendGameAccounts(i) do
+			local _, characterName, client, realmName = BNGetFriendGameAccountInfo(i, j)
+			if client == BNET_CLIENT_WOW then
+				friendsList[Ambiguate(characterName.."-"..realmName, "none")] = true
 			end
 		end
 	end
 end
-B.genFilterList = genFilterList
+B:RegisterEvent("FRIENDLIST_UPDATE", updateFriends)
+B:RegisterEvent("BN_FRIEND_INFO_CHANGED", updateFriends)
 
-local function genChatFilter(self, event, msg, author, _, _, _, flag)
+local function genChatFilter(_, event, msg, author, _, _, _, flag)
 	if not NDuiDB["Chat"]["EnableFilter"] then return end
 
 	local name = Ambiguate(author, "none")
-	if UnitIsUnit(name, "player") then
+	if UnitIsUnit(name, "player") or (event == "CHAT_MSG_WHISPER" and flag == "GM") or flag == "DEV" then
 		return
-	elseif B.UnitInGuild(author) or UnitInRaid(author) or UnitInParty(author) then
+	elseif B.UnitInGuild(author) or UnitInRaid(name) or UnitInParty(name) or friendsList[name] then
 		return
-	elseif event == "CHAT_MSG_WHISPER" and flag == "GM" then
-		return
-	else
-		for i = 1, GetNumFriends() do
-			if author == GetFriendInfo(i) then
-				return
-			end
-		end
-		for i = 1, BNGetNumFriends() do
-			local _, _, battleTag, _, charName, _, client = BNGetFriendInfo(i)
-			if author == BNet_GetValidatedCharacterName(charName, battleTag, client) then
-				return
-			end
-		end
 	end
 
-	for _, symbol in ipairs(DB.Symbols) do
+	for _, symbol in ipairs(msgSymbols) do
 		msg = gsub(msg, symbol, "")
 	end
 
 	local match = 0
-	for keyword, _ in pairs(FilterList) do
-		local _, count = gsub(msg, keyword, "")
-		if count > 0 then
-			match = match + 1
+	for _, keyword in pairs(FilterList) do
+		if keyword ~= "" then
+			local _, count = gsub(msg, keyword, "")
+			if count > 0 then
+				match = match + 1
+			end
 		end
 	end
 
@@ -84,8 +96,12 @@ local function genChatFilter(self, event, msg, author, _, _, _, flag)
 	end
 end
 
-local addonBlockList = {"任务进度提示%s?[:：]", "%[接受任务%]", "%(任务完成%)", "<大脚组队提示>", "<大脚团队提示>", "【网%.易%.有%.爱】", "EUI:", "EUI_RaidCD", "打断:.+|Hspell", "PS 死亡: .+>", "%*%*.+%*%*"}
-local function genAddonBlock(self, event, msg, author, _, _, _, flag)
+local addonBlockList = {
+	"任务进度提示%s?[:：]", "%[接受任务%]", "%(任务完成%)", "<大脚组队提示>", "<大脚团队提示>", "【网%.易%.有%.爱】", "EUI:", "EUI_RaidCD", "打断:.+|Hspell", "PS 死亡: .+>", "%*%*.+%*%*",
+	"<iLvl>", ("%-"):rep(30), "<小队物品等级:.+>", "<LFG>", "wowcdk"
+}
+
+local function genAddonBlock(_, _, msg, author)
 	if not NDuiDB["Chat"]["BlockAddonAlert"] then return end
 
 	local name = Ambiguate(author, "none")
@@ -98,57 +114,65 @@ local function genAddonBlock(self, event, msg, author, _, _, _, flag)
 	end
 end
 
+
+--[[
+	公会频道有人@时提示你
+]]
+local chatAtList, at = {}, {}
+local function genChatAtList()
+	chatAtList = {string.split(" ", NDuiDB["Chat"]["AtList"] or "")}
+	local name = UnitName("player")
+	tinsert(chatAtList, name)
+end
+B.genChatAtList = genChatAtList
+
+local function chatAtMe(_, _, ...)
+	local msg, author, _, _, _, _, _, _, _, _, _, guid = ...
+	for _, word in pairs(chatAtList) do
+		if word ~= "" then
+			if msg:lower():match("@"..word:lower()) then
+				at.checker = true
+				at.author = author
+				at.class = select(2, GetPlayerInfoByGUID(guid))
+				BNToastFrame:AddToast(BN_TOAST_TYPE_NEW_INVITE)
+			end
+		end
+	end
+end
+
+hooksecurefunc(BNToastFrame, "ShowToast", function(self)
+	if at.checker == true then
+		self:SetHeight(50)
+		self.IconTexture:SetTexCoord(.75, 1, 0, .5)
+		self.TopLine:Hide()
+		self.MiddleLine:Hide()
+		self.BottomLine:Hide()
+		self.DoubleLine:Show()
+
+		local hexColor = B.HexRGB(B.ClassColor(at.class))
+		self.DoubleLine:SetText(format("%s "..DB.InfoColor.."@"..YOU.."! ("..GUILD..")", hexColor..Ambiguate(at.author, "short")))
+		at.checker = false
+	end
+end)
+
 function module:ChatFilter()
 	genFilterList()
+	genChatAtList()
 
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL", genChatFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_SAY", genChatFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_YELL", genChatFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", genChatFilter)
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_TEXT_EMOTE", genChatFilter)
+	ChatFrame_AddMessageEventFilter("CHAT_MSG_EMOTE", genChatFilter)
 
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_SAY", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", genAddonBlock)
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_EMOTE", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_PARTY", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_PARTY_LEADER", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_RAID", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_RAID_LEADER", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_INSTANCE_CHAT", genAddonBlock)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_INSTANCE_CHAT_LEADER", genAddonBlock)
+
+	ChatFrame_AddMessageEventFilter("CHAT_MSG_GUILD", chatAtMe)
 end
-
---[[
-	公会频道有人@时提示你
-]]
-local at = NDui:EventFrame("CHAT_MSG_GUILD")
-at:SetScript("OnEvent", function(self, event, ...)
-	local msg, author, _, _, _, _, _, _, _, _, _, guid = ...
-	local list = {string.split(" ", NDuiDB["Chat"]["AtList"])}
-	local name = UnitName("player")
-	tinsert(list, name)
-
-	for _, word in pairs(list) do
-		if word ~= "" then
-			if msg:lower():match("@"..word:lower()) then
-				at.checker = true
-				at.author = author
-				at.class = select(2, GetPlayerInfoByGUID(guid))
-				BNToastFrame_AddToast()
-			end
-		end
-	end
-end)
-hooksecurefunc("BNToastFrame_Show", function()
-	if at.checker == true then
-		BNToastFrame:SetHeight(50)
-		BNToastFrameIconTexture:SetTexCoord(.75, 1, 0, .5)
-		BNToastFrameTopLine:Hide()
-		BNToastFrameMiddleLine:Hide()
-		BNToastFrameBottomLine:Hide()
-		BNToastFrameDoubleLine:Show()
-		local hexColor = B.HexRGB(B.ClassColor(at.class))
-		BNToastFrameDoubleLine:SetText(format("%s "..DB.InfoColor.."@"..YOU.."! ("..GUILD..")", hexColor..Ambiguate(at.author, "short")))
-		at.checker = false
-	end
-end)

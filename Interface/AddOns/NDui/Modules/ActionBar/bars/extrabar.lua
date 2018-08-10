@@ -1,9 +1,10 @@
-local B, C, L, DB = unpack(select(2, ...))
-local Bar = NDui:GetModule("Actionbar")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local Bar = B:GetModule("Actionbar")
 local cfg = C.bars.extrabar
-local padding, margin = 10, 5
 
 function Bar:CreateExtrabar()
+	local padding, margin = 10, 5
 	local num = 1
 	local buttonList = {}
 
@@ -37,6 +38,18 @@ function Bar:CreateExtrabar()
 
 	--create the mouseover functionality
 	if cfg.fader then
-		NDui.CreateButtonFrameFader(frame, buttonList, cfg.fader)
+		B.CreateButtonFrameFader(frame, buttonList, cfg.fader)
 	end
+
+	--zone ability
+	ZoneAbilityFrame:ClearAllPoints()
+	ZoneAbilityFrame.ignoreFramePositionManager = true
+	ZoneAbilityFrameNormalTexture:SetAlpha(0)
+	B.Mover(ZoneAbilityFrame, L["Zone Ability"], "ZoneAbility", {"BOTTOM", UIParent, "BOTTOM", -250, 100}, 64, 64)
+
+	local spellButton = ZoneAbilityFrame.SpellButton
+	spellButton.Style:SetAlpha(0)
+	spellButton.Icon:SetTexCoord(.08, .92, .08, .92)
+	spellButton:GetHighlightTexture():SetColorTexture(1, 1, 1, .25)
+	B.CreateSD(spellButton.Icon, 3, 3)
 end

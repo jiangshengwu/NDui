@@ -1,4 +1,5 @@
-local B, C, L, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 ---------------------------
 -- TradeTabs, by tardmrr
 -- NDui MOD
@@ -46,13 +47,13 @@ function TradeTabs:OnEvent(event, addon)
 end
 
 local function buildSpellList()
-	local p1, p2, arch, fishing, cooking, firstaid = GetProfessions()
+	local p1, p2, _, _, cooking, firstaid = GetProfessions()
 	local profs = {p1, p2, cooking, firstaid}
 	local tradeSpells = {}
 	local extras = 0
 
 	for _, prof in pairs(profs) do
-		local name, icon, _, _, abilities, offset, skillLine = GetProfessionInfo(prof)
+		local _, _, _, _, abilities, offset, skillLine = GetProfessionInfo(prof)
 		if whitelist[skillLine] then
 			if onlyPrimary[skillLine] then
 				abilities = 1
@@ -138,7 +139,7 @@ local function updateSelection(self)
 end
 
 local function createClickStopper(button)
-	local f = CreateFrame("Frame",nil,button)
+	local f = CreateFrame("Frame", nil, button)
 	f:SetAllPoints(button)
 	f:EnableMouse(true)
 	f:SetScript("OnEnter", onEnter)
@@ -160,8 +161,8 @@ function TradeTabs:CreateTab(i, parent, spellID)
 
 	button:SetNormalTexture(texture)
 	button:GetHighlightTexture():SetColorTexture(1, 1, 1, .25)
-	if IsAddOnLoaded("Aurora") then
-		local F, C = unpack(Aurora)
+	if IsAddOnLoaded("AuroraClassic") then
+		local F, C = unpack(AuroraClassic)
 		button:SetCheckedTexture(C.media.checked)
 		button:GetRegions():Hide()
 		F.CreateBG(button)

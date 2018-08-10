@@ -1,46 +1,80 @@
--- Initial
-local _, ns = ...
+local addonName, ns = ...
 ns[1] = {}			-- B, Basement
 ns[2] = {}			-- C, Config
-ns[3] = {}			-- L, LocaleDB
-ns[4] = {}			-- DB, DataBase
-ns.modules = {}		-- Addon Modules
-ns.initQueue = {}	-- Initialize Queue
+ns[3] = {}			-- L, Locales
+ns[4] = {}			-- DB, Database
 NDuiADB = NDuiADB or {}
 NDuiDB = NDuiDB or {}
 
-function ns:RegisterModule(name, ...)
-	if self.modules[name] then print("Module <"..name.."> has been registered.") return end
-	local module = {}
-	module.name = name
-	module.func = ...
+local B, C, L, D = unpack(ns)
 
-	self.modules[name] = module
-	tinsert(ns.initQueue, module)
-	return module
-end
+-- Events
+local events = {}
 
-function ns:GetModule(name)
-	if not self.modules[name] then print("Module <"..name.."> not found.") return end
-	return self.modules[name]
-end
-
-function ns:EventFrame(event)
-	local f = CreateFrame("Frame")
-	if type(event) == "table" then
-		for _, v in pairs(event) do
-			f:RegisterEvent(v)
+local host = CreateFrame("Frame")
+host:SetScript("OnEvent", function(_, event, ...)
+	for func in pairs(events[event]) do
+		if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+			func(event, CombatLogGetCurrentEventInfo())
+		else
+			func(event, ...)
 		end
-	else
-		f:RegisterEvent(event)
-	end
-	return f
-end
-
-ns:EventFrame("PLAYER_LOGIN"):SetScript("OnEvent", function()
-	for _, module in pairs(ns.initQueue) do
-		module:OnLogin()
 	end
 end)
 
-NDui = ns
+function B:RegisterEvent(event, func, unit1, unit2)
+	if not events[event] then
+		events[event] = {}
+		if unit1 then
+			host:RegisterUnitEvent(event, unit1, unit2)
+		else
+			host:RegisterEvent(event)
+		end
+	end
+
+	events[event][func] = true
+end
+
+function B:UnregisterEvent(event, func)
+	local funcs = events[event]
+	if funcs and funcs[func] then
+		funcs[func] = nil
+
+		if not next(funcs) then
+			events[event] = nil
+			host:UnregisterEvent(event)
+		end
+	end
+end
+
+-- Modules
+local modules, initQueue = {}, {}
+
+function B:RegisterModule(name)
+	if modules[name] then print("Module <"..name.."> has been registered.") return end
+	local module = {}
+	module.name = name
+	modules[name] = module
+
+	tinsert(initQueue, module)
+	return module
+end
+
+function B:GetModule(name)
+	if not modules[name] then print("Module <"..name.."> does not exist.") return end
+
+	return modules[name]
+end
+
+-- Init
+B:RegisterEvent("PLAYER_LOGIN", function()
+	for _, module in pairs(initQueue) do
+		if module.OnLogin then
+			module:OnLogin()
+		else
+			print("Module <"..module.name.."> does not loaded.")
+		end
+	end
+end)
+
+_G[addonName] = ns

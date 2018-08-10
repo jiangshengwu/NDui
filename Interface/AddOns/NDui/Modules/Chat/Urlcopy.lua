@@ -1,19 +1,17 @@
-﻿local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Chat")
+﻿local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Chat")
 
 function module:UrlCopy()
 	local foundurl = false
-	local function colorconvert(text, color)
-		return DB.InfoColor..text.."|r"
+
+	local function linkconvert(text, value)
+		return "|Hurl:"..tostring(value).."|h"..DB.InfoColor..text.."|r|h"
 	end
 
-	local function linkconvert(text, type, value, color)
-		return "|H"..type..":"..tostring(value).."|h"..colorconvert(text, color or "ffffff").."|h"
-	end
-
-	local function highlighturl(before, url, after)
+	local function highlighturl(_, url)
 		foundurl = true
-		return " "..linkconvert("["..url.."]", "url", url, color).." "
+		return " "..linkconvert("["..url.."]", url).." "
 	end
 
 	local function searchforurl(frame, text, ...)
@@ -48,32 +46,50 @@ function module:UrlCopy()
 			text = string.gsub(text, "(%s?)([_%w-%.~-]+@[_%w-]+%.[_%w-%.]+)(%s?)", highlighturl)
 		end
 
-		frame.am(frame,text,...)
+		frame.am(frame, text, ...)
 	end
 
 	for i = 1, NUM_CHAT_WINDOWS do
-		if ( i ~= 2 ) then
+		if i ~= 2 then
 			local cf = _G["ChatFrame"..i]
 			cf.am = cf.AddMessage
 			cf.AddMessage = searchforurl
 		end
 	end
 
-	local orig = ChatFrame_OnHyperlinkShow
-	function ChatFrame_OnHyperlinkShow(frame, link, text, button)
+	local orig = ItemRefTooltip.SetHyperlink
+	function ItemRefTooltip:SetHyperlink(link, ...)
+		if link and link:sub(0, 3) == "url" then return end
+
+		return orig(self, link, ...)
+	end
+
+	hooksecurefunc("ChatFrame_OnHyperlinkShow", function(frame, link, _, button)
 		local type, value = link:match("(%a+):(.+)")
-		if IsAltKeyDown() and type == "player" then
-			InviteToGroup(value:match("([^:]+)"))
-		elseif IsModifierKeyDown() and type == "BNplayer" then
-			local _, bnID = value:match("([^:]*):([^:]*):")
-			if not bnID then return end
-			local _, _, _, _, _, gameID = BNGetFriendInfoByID(bnID)
-			if gameID and CanCooperateWithGameAccount(gameID) then
+		local hide
+		if button == "LeftButton" and IsModifierKeyDown() then
+			if type == "player" then
+				local unit = value:match("([^:]+)")
 				if IsAltKeyDown() then
-					BNInviteFriend(gameID)
+					InviteToGroup(unit)
+					hide = true
 				elseif IsControlKeyDown() then
-					local _, charName, _, realmName = BNGetGameAccountInfo(gameID)
-					GuildInvite(charName.."-"..realmName)
+					GuildInvite(unit)
+					hide = true
+				end
+			elseif type == "BNplayer" then
+				local _, bnID = value:match("([^:]*):([^:]*):")
+				if not bnID then return end
+				local _, _, _, _, _, gameID = BNGetFriendInfoByID(bnID)
+				if gameID and CanCooperateWithGameAccount(gameID) then
+					if IsAltKeyDown() then
+						BNInviteFriend(gameID)
+						hide = true
+					elseif IsControlKeyDown() then
+						local _, charName, _, realmName = BNGetGameAccountInfo(gameID)
+						GuildInvite(charName.."-"..realmName)
+						hide = true
+					end
 				end
 			end
 		elseif type == "url" then
@@ -84,8 +100,8 @@ function module:UrlCopy()
 				eb:SetFocus()
 				eb:HighlightText()
 			end
-		else
-			orig(self, link, text, button)
 		end
-	end
+
+		if hide then ChatEdit_ClearChat(ChatFrame1.editBox) end
+	end)
 end

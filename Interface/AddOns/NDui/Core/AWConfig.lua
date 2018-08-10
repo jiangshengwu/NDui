@@ -1,4 +1,5 @@
-local B, C, L, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 
 local r, g, b = DB.cc.r, DB.cc.g, DB.cc.b
 local f
@@ -122,8 +123,8 @@ local function CreatePanel()
 		scroll:SetPoint("BOTTOMLEFT", 10, 10)
 		B.CreateBD(scroll, .2)
 		B.CreateFS(scroll, 15, L["AuraWatch List"], false, "TOPLEFT", 5, 20)
-		if IsAddOnLoaded("Aurora") then
-			local F = unpack(Aurora)
+		if IsAddOnLoaded("AuroraClassic") then
+			local F = unpack(AuroraClassic)
 			F.ReskinScroll(scroll.ScrollBar)
 		end
 
@@ -220,7 +221,7 @@ local function CreatePanel()
 	end
 
 	local function AddInternal(parent, index, data)
-		local intID, duration, itemID = unpack(data)
+		local intID, duration, trigger, unit, itemID = unpack(data)
 		local name, _, texture = GetSpellInfo(intID)
 		if itemID then
 			name = GetItemInfo(itemID)
@@ -236,7 +237,7 @@ local function CreatePanel()
 		icon:SetPoint("LEFT", 5, 0)
 		B.CreateIF(icon, true)
 		icon.Icon:SetTexture(texture)
-		B.CreateAT(icon, "ANCHOR_RIGHT", intID)
+		B.AddTooltip(icon, "ANCHOR_RIGHT", intID)
 
 		local close = CreateFrame("Button", nil, bar)
 		close:SetSize(20, 20)
@@ -255,6 +256,7 @@ local function CreatePanel()
 		spellName:SetWidth(180)
 		spellName:SetJustifyH("LEFT")
 		B.CreateFS(bar, 14, duration, false, "RIGHT", -30, 0)
+		B.AddTooltip(bar, "ANCHOR_TOP", L["Trigger"]..trigger.." - "..unit, "system")
 
 		SortBars(index)
 	end
@@ -273,7 +275,7 @@ local function CreatePanel()
 		icon:SetPoint("LEFT", 5, 0)
 		B.CreateIF(icon, true)
 		icon.Icon:SetTexture(texture)
-		B.CreateAT(icon, "ANCHOR_RIGHT", spellID)
+		B.AddTooltip(icon, "ANCHOR_RIGHT", spellID)
 
 		local close = CreateFrame("Button", nil, bar)
 		close:SetSize(20, 20)
@@ -308,7 +310,7 @@ local function CreatePanel()
 	local function AddRaidClickSets(parent, index, data)
 		local key, modKey, value = unpack(data)
 		local clickSet = modKey..key
-		local name, texture
+		local name, texture, _
 		if tonumber(value) then
 			name, _, texture = GetSpellInfo(value)
 		else
@@ -326,11 +328,7 @@ local function CreatePanel()
 		icon:SetPoint("LEFT", 5, 0)
 		B.CreateIF(icon, true)
 		icon.Icon:SetTexture(texture)
-		if tonumber(value) then
-			B.CreateAT(icon, "ANCHOR_RIGHT", value)
-		else
-			B.CreateGT(icon, "ANCHOR_RIGHT", value, "system")
-		end
+		B.AddTooltip(icon, "ANCHOR_RIGHT", value, "system")
 
 		local close = CreateFrame("Button", nil, bar)
 		close:SetSize(20, 20)
@@ -358,9 +356,18 @@ local function CreatePanel()
 		SortBars(index)
 	end
 
+	local function CreateGroupSwitcher(parent, index)
+		local bu = B.CreateCheckBox(parent)
+		bu:SetHitRectInsets(-100, 0, 0, 0)
+		bu:SetPoint("TOPRIGHT", -40, -145)
+		bu:SetChecked(NDuiDB["AuraWatchList"]["Switcher"..index])
+		bu:SetScript("OnClick", function()
+			NDuiDB["AuraWatchList"]["Switcher"..index] = bu:GetChecked()
+		end)
+		B.CreateFS(bu, 15, "|cffff0000"..L["AW Switcher"], false, "RIGHT", -25, 0)
+	end
+
 	-- Main
-	if not NDuiDB["AuraWatchList"] then NDuiDB["AuraWatchList"] = {} end
-	if not NDuiDB["InternalCD"] then NDuiDB["InternalCD"] = {} end
 	local groups = {
 		L["Player Aura"],			-- 1 PlayerBuff
 		L["Special Aura"],			-- 2 SPECIAL
@@ -381,8 +388,42 @@ local function CreatePanel()
 		[3] = EJ_GetInstanceInfo(786),
 		[4] = EJ_GetInstanceInfo(875),
 		[5] = EJ_GetInstanceInfo(946),
+		[6] = EJ_GetInstanceInfo(1031),
+	}
+	local preSet = {
+		[1] = {1, true},
+		[2] = {1, true},
+		[3] = {2, true},
+		[4] = {2, false},
+		[5] = {3, false},
+		[6] = {1, false},
+		[7] = {1, false},
+		[8] = {1, false},
+		[9] = {1, false},
 	}
 	local tabs = {}
+	local function tabOnClick(self)
+		for i = 1, #tabs do
+			if self == tabs[i] then
+				tabs[i].Page:Show()
+				tabs[i]:SetBackdropColor(r, g, b, .3)
+				tabs[i].selected = true
+			else
+				tabs[i].Page:Hide()
+				tabs[i]:SetBackdropColor(0, 0, 0, .3)
+				tabs[i].selected = false
+			end
+		end
+	end
+	local function tabOnEnter(self)
+		if self.selected then return end
+		self:SetBackdropColor(r, g, b, .3)
+	end
+	local function tabOnLeave(self)
+		if self.selected then return end
+		self:SetBackdropColor(0, 0, 0, .3)
+	end
+
 	for i, group in pairs(groups) do
 		if not NDuiDB["AuraWatchList"][i] then NDuiDB["AuraWatchList"][i] = {} end
 		barTable[i] = {}
@@ -417,17 +458,19 @@ local function CreatePanel()
 			Option[10] = CreateDropdown(tabs[i].Page, L["Slot*"], 140, -30, {slotIndex[6], slotIndex[11], slotIndex[12], slotIndex[13], slotIndex[14], slotIndex[15]}, L["Slot Intro"])
 			Option[11] = CreateDropdown(tabs[i].Page, L["Totem*"], 140, -30, {L["TotemSlot"].."1", L["TotemSlot"].."2", L["TotemSlot"].."3", L["TotemSlot"].."4"}, L["Totem Intro"])
 
-			for i = 2, 11 do Option[i]:Hide() end
+			for j = 2, 11 do Option[j]:Hide() end
 
-			for i = 1, #Option[1].options do
-				Option[1].options[i]:HookScript("OnClick", function()
-					for i = 2, 11 do
-						Option[i]:Hide()
-						ClearEdit(Option[i])
+			for j = 1, #Option[1].options do
+				Option[1].options[j]:HookScript("OnClick", function()
+					for k = 2, 11 do
+						Option[k]:Hide()
+						ClearEdit(Option[k])
 					end
 
 					if Option[1].Text:GetText() == "AuraID" then
-						for j = 2, 9 do Option[j]:Show() end
+						for k = 2, 9 do Option[k]:Show() end
+						Option[3].options[preSet[i][1]]:Click()
+						if preSet[i][2] then Option[4].options[1]:Click() end
 					elseif Option[1].Text:GetText() == "SpellID" then
 						Option[2]:Show()
 					elseif Option[1].Text:GetText() == "SlotID" then
@@ -443,21 +486,27 @@ local function CreatePanel()
 			end
 			Option[12] = CreateEditbox(tabs[i].Page, L["IntID*"], 20, -30, L["IntID Intro"])
 			Option[13] = CreateEditbox(tabs[i].Page, L["Duration*"], 140, -30, L["Duration Intro"])
-			Option[14] = CreateEditbox(tabs[i].Page, L["ItemID"], 260, -30, L["ItemID Intro"])
+			Option[14] = CreateDropdown(tabs[i].Page, L["Trigger"].."*", 260, -30, {"OnAuraGain", "OnCastSuccess"}, L["Trigger Intro"], 130, 30)
+			Option[15] = CreateDropdown(tabs[i].Page, L["Unit*"], 420, -30, {"Player", "All"}, L["Trigger Unit Intro"])
+			Option[16] = CreateEditbox(tabs[i].Page, L["ItemID"], 20, -95, L["ItemID Intro"])
 		elseif i == 11 then
 			for _, v in pairs(NDuiADB["RaidDebuffs"]) do
 				AddRaidDebuffs(tabs[i].List.Child, i, v)
 			end
-			Option[15] = CreateDropdown(tabs[i].Page, L["Instance*"], 20, -30, {instList[1], instList[2], instList[3], instList[4], instList[5]}, L["Instance Intro"], 150, 30)
-			Option[16] = CreateEditbox(tabs[i].Page, "ID*", 200, -30, L["ID Intro"])
-			Option[17] = CreateEditbox(tabs[i].Page, L["Priority"], 320, -30, L["Priority Intro"])
+			local instTable = {}
+			for _, inst in ipairs(instList) do
+				tinsert(instTable, inst)
+			end
+			Option[17] = CreateDropdown(tabs[i].Page, L["Instance*"], 20, -30, instTable, L["Instance Intro"], 200, 30)
+			Option[18] = CreateEditbox(tabs[i].Page, "ID*", 250, -30, L["ID Intro"])
+			Option[19] = CreateEditbox(tabs[i].Page, L["Priority"], 370, -30, L["Priority Intro"])
 		elseif i == 12 then
 			for _, v in pairs(NDuiDB["RaidClickSets"]) do
 				AddRaidClickSets(tabs[i].List.Child, i, v)
 			end
-			Option[18] = CreateEditbox(tabs[i].Page, L["Action*"], 20, -30, L["Action Intro"], 110, 30)
-			Option[19] = CreateDropdown(tabs[i].Page, L["Key*"], 160, -30, {KEY_BUTTON1, KEY_BUTTON2, KEY_BUTTON3, KEY_BUTTON4, KEY_BUTTON5}, L["Key Intro"], 110, 30)
-			Option[20] = CreateDropdown(tabs[i].Page, L["Modified Key"], 300, -30, {NONE, "ALT", "CTRL", "SHIFT"}, L["ModKey Intro"], 110, 30)
+			Option[20] = CreateEditbox(tabs[i].Page, L["Action*"], 20, -30, L["Action Intro"], 200, 30)
+			Option[21] = CreateDropdown(tabs[i].Page, L["Key*"], 250, -30, {KEY_BUTTON1, KEY_BUTTON2, KEY_BUTTON3, KEY_BUTTON4, KEY_BUTTON5}, L["Key Intro"], 110, 30)
+			Option[22] = CreateDropdown(tabs[i].Page, L["Modified Key"], 390, -30, {NONE, "ALT", "CTRL", "SHIFT"}, L["ModKey Intro"], 110, 30)
 
 			local reset = B.CreateButton(tabs[i].Page, 70, 25, RESET)
 			reset:SetPoint("TOPRIGHT", -200, -90)
@@ -483,11 +532,11 @@ local function CreatePanel()
 				for j = 1, 11 do ClearEdit(Option[j]) end
 				for j = 2, 11 do Option[j]:Hide() end
 			elseif i == 10 then
-				for j = 12, 14 do ClearEdit(Option[j]) end
+				for j = 12, 16 do ClearEdit(Option[j]) end
 			elseif i == 11 then
-				for j = 15, 17 do ClearEdit(Option[j]) end
+				for j = 17, 19 do ClearEdit(Option[j]) end
 			elseif i== 12 then
-				for j = 18, 20 do ClearEdit(Option[j]) end
+				for j = 20, 22 do ClearEdit(Option[j]) end
 			end
 		end)
 
@@ -511,20 +560,20 @@ local function CreatePanel()
 				local realID = spellID or slotID or totemID
 				if NDuiDB["AuraWatchList"][i][realID] then UIErrorsFrame:AddMessage(DB.InfoColor..L["Existing ID"]) return end
 
-				NDuiDB["AuraWatchList"][i][realID] = {typeID, realID, unitID, Option[4].Text:GetText(), tonumber(Option[5]:GetText()), Option[6]:GetChecked(), Option[7]:GetChecked(), Option[7]:GetChecked(), Option[9]:GetText()}
+				NDuiDB["AuraWatchList"][i][realID] = {typeID, realID, unitID, Option[4].Text:GetText(), tonumber(Option[5]:GetText()), Option[6]:GetChecked(), Option[7]:GetChecked(), Option[8]:GetChecked(), Option[9]:GetText()}
 				AddAura(tabs[i].List.Child, i, NDuiDB["AuraWatchList"][i][realID])
 				for i = 1, 11 do ClearEdit(Option[i]) end
 			elseif i == 10 then
-				local intID, duration, itemID = tonumber(Option[12]:GetText()), tonumber(Option[13]:GetText()), tonumber(Option[14]:GetText())
-				if not intID or not duration then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incomplete Input"]) return end
+				local intID, duration, trigger, unit, itemID = tonumber(Option[12]:GetText()), tonumber(Option[13]:GetText()), Option[14].Text:GetText(), Option[15].Text:GetText(), tonumber(Option[16]:GetText())
+				if not intID or not duration or not trigger or not unit then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incomplete Input"]) return end
 				if intID and not GetSpellInfo(intID) then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incorrect SpellID"]) return end
 				if NDuiDB["InternalCD"][intID] then UIErrorsFrame:AddMessage(DB.InfoColor..L["Existing ID"]) return end
 
-				NDuiDB["InternalCD"][intID] = {intID, duration, itemID}
+				NDuiDB["InternalCD"][intID] = {intID, duration, trigger, unit, itemID}
 				AddInternal(tabs[i].List.Child, i, NDuiDB["InternalCD"][intID])
-				for i = 12, 14 do ClearEdit(Option[i]) end
+				for i = 12, 16 do ClearEdit(Option[i]) end
 			elseif i == 11 then
-				local instName, spellID, priority = Option[15].Text:GetText(), tonumber(Option[16]:GetText()), tonumber(Option[17]:GetText())
+				local instName, spellID, priority = Option[17].Text:GetText(), tonumber(Option[18]:GetText()), tonumber(Option[19]:GetText())
 				if not instName or not spellID then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incomplete Input"]) return end
 				if spellID and not GetSpellInfo(spellID) then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incorrect SpellID"]) return end
 				if NDuiADB["RaidDebuffs"][spellID] then UIErrorsFrame:AddMessage(DB.InfoColor..L["Existing ID"]) return end
@@ -532,63 +581,49 @@ local function CreatePanel()
 				priority = (priority and priority < 0 and 0) or (not priority and 2)
 				NDuiADB["RaidDebuffs"][spellID] = {instName, spellID, priority}
 				AddRaidDebuffs(tabs[i].List.Child, i, NDuiADB["RaidDebuffs"][spellID])
-				for i = 15, 17 do ClearEdit(Option[i]) end
+				for i = 17, 19 do ClearEdit(Option[i]) end
 			elseif i == 12 then
-				local value, key, modKey = Option[18]:GetText(), Option[19].Text:GetText(), Option[20].Text:GetText()
+				local value, key, modKey = Option[20]:GetText(), Option[21].Text:GetText(), Option[22].Text:GetText()
 				if not value or not key then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incomplete Input"]) return end
 				if tonumber(value) and not GetSpellInfo(value) then UIErrorsFrame:AddMessage(DB.InfoColor..L["Incorrect SpellID"]) return end
-				if (not tonumber(value)) and value ~= "target" and value ~= "focus" and value ~= "follow" then UIErrorsFrame:AddMessage(DB.InfoColor..L["Invalid Input"]) return end
+				if (not tonumber(value)) and value ~= "target" and value ~= "focus" and value ~= "follow" and not value:match("/") then UIErrorsFrame:AddMessage(DB.InfoColor..L["Invalid Input"]) return end
 				if not modKey or modKey == NONE then modKey = "" end
 				local clickSet = modKey..key
 				if NDuiDB["RaidClickSets"][clickSet] then UIErrorsFrame:AddMessage(DB.InfoColor..L["Existing ClickSet"]) return end
 
 				NDuiDB["RaidClickSets"][clickSet] = {key, modKey, value}
 				AddRaidClickSets(tabs[i].List.Child, i, NDuiDB["RaidClickSets"][clickSet])
-				for i = 18, 20 do ClearEdit(Option[i]) end
+				for i = 20, 22 do ClearEdit(Option[i]) end
 			end
 		end)
 
-		tabs[i]:SetScript("OnClick", function()
-			for index = 1, #tabs do
-				if i == index then
-					tabs[index].Page:Show()
-					tabs[index]:SetBackdropColor(r, g, b, .3)
-					tabs[index].selected = true
-				else
-					tabs[index].Page:Hide()
-					tabs[index]:SetBackdropColor(0, 0, 0, .3)
-					tabs[index].selected = false
-				end
-			end
-		end)
-		tabs[i]:SetScript("OnEnter", function(self)
-			if self.selected then return end
-			self:SetBackdropColor(r, g, b, .3)
-		end)
-		tabs[i]:SetScript("OnLeave", function(self)
-			if self.selected then return end
-			self:SetBackdropColor(0, 0, 0, .3)
-		end)
+		tabs[i]:SetScript("OnClick", tabOnClick)
+		tabs[i]:SetScript("OnEnter", tabOnEnter)
+		tabs[i]:SetScript("OnLeave", tabOnLeave)
 	end
-	
+
+	for i = 1, 10 do
+		CreateGroupSwitcher(tabs[i].Page, i)
+	end
+
 	tabs[1]:Click()
 
-	NDui:EventFrame("PLAYER_REGEN_DISABLED"):SetScript("OnEvent", function(self, event)
+	local function showLater(event)
 		if event == "PLAYER_REGEN_DISABLED" then
 			if f:IsShown() then
 				f:Hide()
-				self:RegisterEvent("PLAYER_REGEN_ENABLED")
+				B:RegisterEvent("PLAYER_REGEN_ENABLED", showLater)
 			end
 		else
 			f:Show()
-			self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+			B:UnregisterEvent(event, showLater)
 		end
-	end)
+	end
+	B:RegisterEvent("PLAYER_REGEN_DISABLED", showLater)
 end
 
 SlashCmdList["NDUI_AWCONFIG"] = function()
 	if InCombatLockdown() then UIErrorsFrame:AddMessage(DB.InfoColor..ERR_NOT_IN_COMBAT) return end
 	CreatePanel()
 end
-SLASH_NDUI_AWCONFIG1 = "/awc"
-SLASH_NDUI_AWCONFIG2 = "/ww"
+SLASH_NDUI_AWCONFIG1 = "/ww"

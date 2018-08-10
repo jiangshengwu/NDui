@@ -1,18 +1,13 @@
-﻿local B, C, L, DB = unpack(select(2, ...))
+﻿local _, ns = ...
+local B, C, L, DB = unpack(ns)
 if not C.Infobar.Friends then return end
 
-local module = NDui:GetModule("Infobar")
+local module = B:GetModule("Infobar")
 local info = module:RegisterInfobar(C.Infobar.FriendsPos)
 
 local friendTable, bnetTable, updateRequest = {}, {}
 local wowString, bnetString = L["WoW"], L["BN"]
 local activeZone, inactiveZone = {r=.3, g=1, b=.3}, {r=.7, g=.7, b=.7}
-
-local flags = {
-	" |T"..FRIENDS_TEXTURE_AFK..":14:14:-2:-2:16:16:0:16:0:16|t",
-	" |T"..FRIENDS_TEXTURE_DND..":14:14:-2:-2:16:16:0:16:0:16|t",
-}
-
 local classList = {}
 for k, v in pairs(LOCALIZED_CLASS_NAMES_MALE) do
 	classList[v] = k
@@ -25,9 +20,9 @@ local function buildFriendTable(num)
 		local name, level, class, area, connected, status = GetFriendInfo(i)
 		if connected then
 			if status == CHAT_FLAG_AFK then
-				status = flags[1]
+				status = DB.AFKTex
 			elseif status == CHAT_FLAG_DND then
-				status = flags[2]
+				status = DB.DNDTex
 			else
 				status = ""
 			end
@@ -59,9 +54,9 @@ local function buildBNetTable(num)
 
 			local status, infoText = ""
 			if isAFK or isGameAFK then
-				status = flags[1]
+				status = DB.AFKTex
 			elseif isDND or isGameBusy then
-				status = flags[2]
+				status = DB.DNDTex
 			else
 				status = ""
 			end
@@ -90,9 +85,6 @@ info.eventList = {
 	"BN_FRIEND_ACCOUNT_ONLINE",
 	"BN_FRIEND_ACCOUNT_OFFLINE",
 	"BN_FRIEND_INFO_CHANGED",
-	"BN_FRIEND_TOON_ONLINE",
-	"BN_FRIEND_TOON_OFFLINE",
-	"BN_TOON_NAME_UPDATED",
 	"FRIENDLIST_UPDATE",
 	"PLAYER_ENTERING_WORLD",
 	"CHAT_MSG_SYSTEM",
@@ -107,7 +99,7 @@ info.onEvent = function(self, event, arg1)
 
 	local _, onlineFriends = GetNumFriends()
 	local _, onlineBNet = BNGetNumFriends()
-	info.text:SetText(format("%s: "..DB.MyColor.."%d", FRIENDS, onlineFriends + onlineBNet))
+	self.text:SetText(format("%s: "..DB.MyColor.."%d", FRIENDS, onlineFriends + onlineBNet))
 	updateRequest = false
 end
 
@@ -120,7 +112,7 @@ info.onEnter = function(self)
 	if not updateRequest then
 		if numFriends > 0 then buildFriendTable(numFriends) end
 		if numBNet > 0 then buildBNetTable(numBNet) end
-		updateRequestr = true
+		updateRequest = true
 	end
 
 	GameTooltip:SetOwner(self, "ANCHOR_NONE")
@@ -137,7 +129,6 @@ info.onEnter = function(self)
 			GameTooltip:AddLine(wowString, 0,.6,1)
 			for i = 1, #friendTable do
 				local name, level, class, area, connected, status = unpack(friendTable[i])
-				local zoneColor, classColor, levelColor
 				if connected then
 					local zoneColor = GetRealZoneText() == area and activeZone or inactiveZone
 					local levelColor = B.HexRGB(GetQuestDifficultyColor(level))
@@ -151,7 +142,7 @@ info.onEnter = function(self)
 			GameTooltip:AddLine(" ")
 			GameTooltip:AddLine(bnetString, 0,.6,1)
 			for i = 1, #bnetTable do
-				local bnetID, accountName, charName, gameID, client, isOnline, status, realmName, class, infoText = unpack(bnetTable[i])
+				local _, accountName, charName, gameID, client, isOnline, status, realmName, class, infoText = unpack(bnetTable[i])
 
 				if isOnline then
 					local zoneColor, realmColor = inactiveZone, inactiveZone
@@ -175,8 +166,9 @@ info.onEnter = function(self)
 			end
 		end
 	end
-	GameTooltip:AddDoubleLine(" ", "--------------", 1,1,1, .5,.5,.5)
-	GameTooltip:AddDoubleLine(" ", DB.LeftButton..L["Show Friends"], 1,1,1, .6,.8,1)
+	GameTooltip:AddDoubleLine(" ", DB.LineString)
+	GameTooltip:AddDoubleLine(" ", L["Hold Shift"], 1,1,1, .6,.8,1)
+	GameTooltip:AddDoubleLine(" ", DB.LeftButton..L["Show Friends"].." ", 1,1,1, .6,.8,1)
 	GameTooltip:Show()
 
 	self:RegisterEvent("MODIFIER_STATE_CHANGED")
@@ -187,8 +179,8 @@ info.onLeave = function(self)
 	self:UnregisterEvent("MODIFIER_STATE_CHANGED")
 end
 
-info.onMouseUp = function(_, button)
-	if button ~= "LeftButton" then return end
+info.onMouseUp = function(_, btn)
+	if btn ~= "LeftButton" then return end
 	GameTooltip:Hide()
 	ToggleFriendsFrame()
 end

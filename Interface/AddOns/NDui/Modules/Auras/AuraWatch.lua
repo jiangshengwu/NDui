@@ -1,17 +1,21 @@
-﻿local B, C, L, DB = unpack(select(2, ...))
-local AuraList, Aura, UnitIDTable, IntTable, IntCD = {}, {}, {}, {}, C.InternalCD
+﻿local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local AuraList, Aura, UnitIDTable, IntTable, IntCD, newTable = {}, {}, {}, {}, {}, {}
 local MaxFrame = 12	-- Max Tracked Auras
 
 -- Init
 local function ConvertTable()
-	if not NDuiDB["AuraWatchList"] then return end
+	if not NDuiDB["AuraWatchList"] then NDuiDB["AuraWatchList"] = {} end
+	if not NDuiDB["InternalCD"] then NDuiDB["InternalCD"] = {} end
 
 	local function DataAnalyze(v)
-		local newTable = {}
+		newTable = {}
 		if type(v[1]) == "number" then
 			newTable.IntID = v[1]
 			newTable.Duration = v[2]
-			newTable.ItemID = v[3]
+			if v[3] == "OnCastSuccess" then newTable.OnSuccess = true end
+			newTable.UnitID = v[4]
+			newTable.ItemID = v[5]
 		else
 			if v[1] == "AuraID" then newTable.AuraID = v[2]
 			elseif v[1] == "SpellID" then newTable.SpellID = v[2]
@@ -48,40 +52,45 @@ local function ConvertTable()
 		end
 	end
 
-	local function InsertData(target, data)
-		for _, v in pairs(data) do
-			tinsert(target, v)
+	local function InsertData(index, target)
+		if NDuiDB["AuraWatchList"]["Switcher"..index] then
+			wipe(target)
+		else
+			for _, v in pairs(myTable[index]) do
+				tinsert(target, v)
+			end
 		end
 	end
 
 	for _, v in pairs(C.AuraWatchList[DB.MyClass]) do
 		if v.Name == "Player Aura" then
-			InsertData(v.List, myTable[1])
+			InsertData(1, v.List)
 		elseif v.Name == "Target Aura" then
-			InsertData(v.List, myTable[3])
+			InsertData(3, v.List)
 		elseif v.Name == "Special Aura" then
-			InsertData(v.List, myTable[2])
+			InsertData(2, v.List)
 		elseif v.Name == "Focus Aura" then
-			InsertData(v.List, myTable[5])
+			InsertData(5, v.List)
 		elseif v.Name == "Spell Cooldown" then
-			InsertData(v.List, myTable[6])
+			InsertData(6, v.List)
 		end
 	end
 
-	for _, v in pairs(C.AuraWatchList["ALL"]) do
+	for i, v in pairs(C.AuraWatchList["ALL"]) do
 		if v.Name == "Enchant Aura" then
-			InsertData(v.List, myTable[7])
+			InsertData(7, v.List)
 		elseif v.Name == "Raid Buff" then
-			InsertData(v.List, myTable[8])
+			InsertData(8, v.List)
 		elseif v.Name == "Raid Debuff" then
-			InsertData(v.List, myTable[9])
+			InsertData(9, v.List)
 		elseif v.Name == "Warning" then
-			InsertData(v.List, myTable[4])
+			InsertData(4, v.List)
+		elseif v.Name == "InternalCD" then
+			InsertData(10, v.List)
+			IntCD = v
+			tremove(C.AuraWatchList["ALL"], i)
 		end
 	end
-
-	-- Fill InternalCD List
-	InsertData(IntCD.List, myTable[10])
 end
 
 local function CheckAuraList()
@@ -98,10 +107,10 @@ local function CheckAuraList()
 end
 
 local function BuildAuraList()
-	AuraList = C.AuraWatchList["ALL"] and C.AuraWatchList["ALL"] or {}
-	for key, _ in pairs(C.AuraWatchList) do
-		if key == DB.MyClass then
-			for _, value in pairs(C.AuraWatchList[DB.MyClass]) do
+	AuraList = C.AuraWatchList["ALL"] or {}
+	for class in pairs(C.AuraWatchList) do
+		if class == DB.MyClass then
+			for _, value in pairs(C.AuraWatchList[class]) do
 				tinsert(AuraList, value)
 			end
 		end
@@ -128,19 +137,20 @@ local function MakeMoveHandle(Frame, Text, key, Pos)
 	MoveHandle:SetFrameStrata("HIGH")
 	B.CreateBD(MoveHandle)
 	B.CreateFS(MoveHandle, 12, Text)
-	if not NDuiDB["AuraWatch"][key] then 
+	if not NDuiDB["AuraWatchMover"] then NDuiDB["AuraWatchMover"] = {} end
+	if not NDuiDB["AuraWatchMover"][key] then 
 		MoveHandle:SetPoint(unpack(Pos))
 	else
-		MoveHandle:SetPoint(unpack(NDuiDB["AuraWatch"][key]))
+		MoveHandle:SetPoint(unpack(NDuiDB["AuraWatchMover"][key]))
 	end
 	MoveHandle:EnableMouse(true)
 	MoveHandle:SetMovable(true)
 	MoveHandle:RegisterForDrag("LeftButton")
-	MoveHandle:SetScript("OnDragStart", function(self) MoveHandle:StartMoving() end)
+	MoveHandle:SetScript("OnDragStart", function() MoveHandle:StartMoving() end)
 	MoveHandle:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
 		local AnchorF, _, AnchorT, X, Y = self:GetPoint()
-		NDuiDB["AuraWatch"][key] = {AnchorF, "UIParent", AnchorT, X, Y}
+		NDuiDB["AuraWatchMover"][key] = {AnchorF, "UIParent", AnchorT, X, Y}
 	end)
 	MoveHandle:Hide()
 	Frame:SetPoint("CENTER", MoveHandle)
@@ -169,10 +179,10 @@ local function BuildICON(iconSize)
 	Frame.Spellname = B.CreateFS(parentFrame, 14, "", false, "BOTTOM", 0, -3)
 	Frame.Count = B.CreateFS(parentFrame, iconSize*.55, "", false, "BOTTOMRIGHT", 6, -3)
 
-	if NDuiDB["AuraWatch"]["Hint"] then
+	if not NDuiDB["AuraWatch"]["ClickThrough"] then
 		Frame:EnableMouse(true)
 		Frame.HL = Frame:CreateTexture(nil, "HIGHLIGHT")
-		Frame.HL:SetColorTexture(1, 1, 1, .3)
+		Frame.HL:SetColorTexture(1, 1, 1, .25)
 		Frame.HL:SetAllPoints(Frame.Icon)
 
 		Frame:SetScript("OnEnter", function(self)
@@ -219,10 +229,10 @@ local function BuildBAR(barWidth, iconSize)
 	Frame.Spellname:SetWidth(Frame.Statusbar:GetWidth()*.6)
 	Frame.Spellname:SetJustifyH("LEFT")
 
-	if NDuiDB["AuraWatch"]["Hint"] then
+	if not NDuiDB["AuraWatch"]["ClickThrough"] then
 		Frame:EnableMouse(true)
 		Frame.HL = Frame:CreateTexture(nil, "HIGHLIGHT")
-		Frame.HL:SetColorTexture(1, 1, 1, .3)
+		Frame.HL:SetColorTexture(1, 1, 1, .25)
 		Frame.HL:SetAllPoints(Frame.Icon)
 
 		Frame:SetScript("OnEnter", function(self)
@@ -274,7 +284,7 @@ local function Pos()
 			local Frame = VALUE[i]
 			if i == 1 then
 				Frame:SetPoint("CENTER", Frame.MoveHandle)
-			elseif value.IconsPerRow and i == value.IconsPerRow + 1 then
+			elseif value.Name == "Target Aura" and i == 7 then
 				Frame:SetPoint("BOTTOM", VALUE[1], "TOP", 0, value.Interval)
 			else
 				if value.Direction:lower() == "right" then
@@ -302,19 +312,14 @@ local function Init()
 end
 
 -- UpdateCD
-local function UpdateCDFrame(index, name, icon, start, duration, bool, type, id, charges)
+local function UpdateCDFrame(index, name, icon, start, duration, _, type, id, charges)
 	local Frame = Aura[index][Aura[index].Index]
 	if Frame then Frame:Show() end
 	if Frame.Icon then Frame.Icon:SetTexture(icon) end
 	if Frame.Cooldown then
 		Frame.Cooldown:SetReverse(false)
-		if charges and charges > 0 then
-			StartChargeCooldown(Frame, start, duration)
-			Frame.Cooldown:SetCooldown(0, 0)
-		else
-			ClearChargeCooldown(Frame)
-			Frame.Cooldown:SetCooldown(start, duration)
-		end
+		Frame.Cooldown:SetCooldown(start, duration)
+		Frame.Cooldown:Show()
 	end
 	if Frame.Count then Frame.Count:SetText(charges) end
 	if Frame.Spellname then Frame.Spellname:SetText(name) end
@@ -322,7 +327,7 @@ local function UpdateCDFrame(index, name, icon, start, duration, bool, type, id,
 		Frame.duration = duration
 		Frame.start = start
 		Frame.Timer = 0
-		Frame:SetScript("OnUpdate", function(self, elapsed)
+		Frame:SetScript("OnUpdate", function(self)
 			self.Timer = self.start + self.duration - GetTime()
 			if self.Timer < 0 then
 				if self.Time then self.Time:SetText("N/A") end
@@ -405,7 +410,7 @@ local function UpdateAuraFrame(index, UnitID, name, icon, count, duration, expir
 		Frame.duration = duration
 		Frame.expires = expires
 		Frame.Timer = 0
-		Frame:SetScript("OnUpdate", function(self, elapsed)
+		Frame:SetScript("OnUpdate", function(self)
 			self.Timer = self.expires-GetTime()
 			if self.Timer < 0 then
 				if self.Time then self.Time:SetText("N/A") end
@@ -435,10 +440,10 @@ end
 
 local function AuraFilter(spellID, UnitID, index, bool)
 	for KEY, VALUE in pairs(AuraList) do
-		for key, value in pairs(VALUE.List) do
+		for _, value in pairs(VALUE.List) do
 			if value.AuraID == spellID and value.UnitID == UnitID then
 				if bool then
-					local name, _, icon, count, _, duration, expires, caster, _, _, _, _, _, _, _, _, number = UnitBuff(value.UnitID, index)
+					local name, icon, count, _, duration, expires, caster, _, _, _, _, _, _, _, _, number = UnitBuff(value.UnitID, index)
 					if value.Combat and not InCombatLockdown() then return false end
 					if value.Caster and value.Caster:lower() ~= caster then return false end
 					if value.Stack and count and value.Stack > count then return false end
@@ -458,7 +463,7 @@ local function AuraFilter(spellID, UnitID, index, bool)
 					if value.Timeless then duration, expires = 0, 0 end
 					return KEY, value.UnitID, name, icon, count, duration, expires, index, "HELPFUL"
 				else
-					local name, _, icon, count, _, duration, expires, caster, _, _, _, _, _, _, _, _, number = UnitDebuff(value.UnitID, index)
+					local name, icon, count, _, duration, expires, caster, _, _, _, _, _, _, _, _, number = UnitDebuff(value.UnitID, index)
 					if value.Combat and not InCombatLockdown() then return false end
 					if value.Caster and value.Caster:lower() ~= caster then return false end
 					if value.Stack and count and value.Stack > count then return false end
@@ -487,14 +492,14 @@ end
 local function UpdateAura(UnitID)
 	local index = 1
     while true do
-		local name, _, _, _, _, _, _, _, _, _, spellID = UnitBuff(UnitID, index)
+		local name, _, _, _, _, _, _, _, _, spellID = UnitBuff(UnitID, index)
 		if not name then break end
 		if AuraFilter(spellID, UnitID, index, true) then UpdateAuraFrame(AuraFilter(spellID, UnitID, index, true)) end
 		index = index + 1
 	end
 	local index = 1
     while true do
-		local name, _, _, _, _, _, _, _, _, _, spellID = UnitDebuff(UnitID, index)
+		local name, _, _, _, _, _, _, _, _, spellID = UnitDebuff(UnitID, index)
 		if not name then break end
 		if AuraFilter(spellID, UnitID, index, false) then UpdateAuraFrame(AuraFilter(spellID, UnitID, index, false)) end
 		index = index + 1
@@ -523,14 +528,16 @@ local function SortBars()
 	end
 end
 
-local function UpdateIntFrame(intID, itemID, duration)
+local function UpdateIntFrame(intID, itemID, duration, unitID, guid)
+	if not UIParent:IsShown() then return end
+
 	local Frame = BuildBAR(IntCD.BarWidth, IntCD.IconSize)
 	if Frame then
 		Frame:Show()
 		tinsert(IntTable, Frame)
 		SortBars()
 	end
-	local name, icon, _
+	local name, icon, _, class
 	if itemID then
 		name, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemID)
 		Frame.type = 2
@@ -540,6 +547,12 @@ local function UpdateIntFrame(intID, itemID, duration)
 		Frame.type = 1
 		Frame.spellID = intID
 	end
+	if unitID:lower() == "all" then
+		_, class, _, _, _, name = GetPlayerInfoByGUID(guid)
+		name = "*"..name
+	else
+		class = DB.MyClass
+	end
 	if Frame.Icon then Frame.Icon:SetTexture(icon) end
 	if Frame.Count then Frame.Count:SetText(nil) end
 	if Frame.Cooldown then
@@ -548,6 +561,7 @@ local function UpdateIntFrame(intID, itemID, duration)
 	end
 	if Frame.Spellname then Frame.Spellname:SetText(name) end
 	if Frame.Statusbar then
+		Frame.Statusbar:SetStatusBarColor(B.ClassColor(class))
 		Frame.Statusbar:SetMinMaxValues(0, duration)
 		Frame.Timer = 0
 		Frame:SetScript("OnUpdate", function(self, elapsed)
@@ -572,23 +586,37 @@ local function UpdateIntFrame(intID, itemID, duration)
 end
 
 local eventList = {
-	["SPELL_DAMAGE"] = true,
-	["SPELL_HEAL"] = true,
 	["SPELL_AURA_APPLIED"] = true,
 	["SPELL_AURA_REFRESH"] = true,
-	["SPELL_ENERGIZE"] = true,
-	["SPELL_SUMMON"] = true,
 }
 
-local function UpdateInt(self, event, ...)
+local function isUnitWeNeed(value, sourceName, destName)
+	if not value.UnitID then value.UnitID = "Player" end
+	if value.UnitID:lower() == "all" then
+		if sourceName and (UnitInRaid(sourceName) or UnitInParty(sourceName)) then
+			return true
+		end
+	elseif value.UnitID:lower() == "player" then
+		if sourceName and sourceName == UnitName("player") or destName == UnitName("player") then
+			return true
+		end
+	end
+end
+
+local cache = {}
+local function UpdateInt(_, ...)
+	if not IntCD.List then return end
 	for _, value in pairs(IntCD.List) do
 		if value.IntID then
-			local _, eventType, _, _, sourceName, _, _, _, destName, _, _, spellID = ...
-			if value.IntID == spellID and eventList[eventType] and (sourceName and sourceName == UnitName("player") or destName == UnitName("player")) then
-				UpdateIntFrame(value.IntID, value.ItemID, value.Duration)
+			local timestamp, eventType, _, sourceGUID, sourceName, _, _, _, destName, _, _, spellID = ...
+			if value.IntID == spellID and isUnitWeNeed(value, sourceName, destName) and cache[timestamp] ~= spellID and
+				((value.OnSuccess and eventType == "SPELL_CAST_SUCCESS") or (not value.OnSuccess and eventList[eventType])) then
+				UpdateIntFrame(value.IntID, value.ItemID, value.Duration, value.UnitID, sourceGUID)
+				cache[timestamp] = spellID
 			end
 		end
 	end
+	if #cache > 666 then wipe(cache) end
 end
 
 -- CleanUp
@@ -608,18 +636,20 @@ local function CleanUp()
 end
 
 -- Event
-local f = NDui:EventFrame({"PLAYER_ENTERING_WORLD", "COMBAT_LOG_EVENT_UNFILTERED"})
-f:SetScript("OnEvent", function(self, event, ...)
+local function onEvent(event, ...)
 	if not NDuiDB["AuraWatch"]["Enable"] then return end
 	if event == "PLAYER_ENTERING_WORLD" then
 		Init()
-		self:UnregisterEvent(event)
+		if not IntCD.MoveHandle then UpdateIntFrame(2825, nil, 0, "player") end
+		B:UnregisterEvent(event, onEvent)
 	else
-		UpdateInt(self, event, ...)
+		UpdateInt(event, ...)
 	end
-end)
+end
+B:RegisterEvent("PLAYER_ENTERING_WORLD", onEvent)
+B:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", onEvent)
 
-local onUpdate = function(self, elapsed)
+local function onUpdate(self, elapsed)
 	self.Timer = (self.Timer or 0) + elapsed
 	if self.Timer > .1 then
 		self.Timer = 0
@@ -630,10 +660,21 @@ local onUpdate = function(self, elapsed)
 		end
 	end
 end
+local f = CreateFrame("Frame")
 f:SetScript("OnUpdate", onUpdate)
 
--- Test
-local TestFlag = true
+-- Mover
+StaticPopupDialogs["RESET_AURAWATCH_MOVER"] = {
+	text = L["Reset AuraWatch Mover Confirm"],
+	button1 = OKAY,
+	button2 = CANCEL,
+	OnAccept = function()
+		wipe(NDuiDB["AuraWatchMover"])
+		ReloadUI()
+	end,
+}
+
+local texture = GetSpellTexture(2825)
 SlashCmdList.AuraWatch = function(msg)
 	if msg:lower() == "move" then
 		f:SetScript("OnUpdate", nil)
@@ -643,7 +684,7 @@ SlashCmdList.AuraWatch = function(msg)
 					value[i]:SetScript("OnUpdate", nil)
 					value[i]:Show()
 				end
-				if value[i].Icon then value[i].Icon:SetTexture(GetSpellTexture(2825)) end
+				if value[i].Icon then value[i].Icon:SetTexture(texture) end
 				if value[i].Count then value[i].Count:SetText("") end
 				if value[i].Time then value[i].Time:SetText("59") end
 				if value[i].Statusbar then value[i].Statusbar:SetValue(1) end
@@ -653,12 +694,24 @@ SlashCmdList.AuraWatch = function(msg)
 		end
 		if IntCD.MoveHandle then
 			IntCD.MoveHandle:Show()
-			IntTable[1]:SetScript("OnUpdate", nil)
-			IntTable[1]:Show()
-			IntTable[1].Spellname:SetText("")
-			IntTable[1].Time:SetText("59")
-			IntTable[1].Statusbar:SetMinMaxValues(0, 1)
-			IntTable[1].Statusbar:SetValue(1)
+			for i = 1, #IntTable do
+				if IntTable[i] then IntTable[i]:Hide() end
+			end
+			wipe(IntTable)
+			UpdateIntFrame(2825, nil, 0, "player")
+			UpdateIntFrame(2825, nil, 0, "player")
+			UpdateIntFrame(2825, nil, 0, "player")
+			UpdateIntFrame(2825, nil, 0, "player")
+			UpdateIntFrame(2825, nil, 0, "player")
+			UpdateIntFrame(2825, nil, 0, "player")
+			for i = 1, #IntTable do
+				IntTable[i]:SetScript("OnUpdate", nil)
+				IntTable[i]:Show()
+				IntTable[i].Spellname:SetText("")
+				IntTable[i].Time:SetText("59")
+				IntTable[i].Statusbar:SetMinMaxValues(0, 1)
+				IntTable[i].Statusbar:SetValue(1)
+			end
 		end
 	elseif msg:lower() == "lock" then
 		CleanUp()
@@ -668,18 +721,10 @@ SlashCmdList.AuraWatch = function(msg)
 		f:SetScript("OnUpdate", onUpdate)
 		if IntCD.MoveHandle then
 			IntCD.MoveHandle:Hide()
-			IntTable[1]:Hide()
+			for i = 1, #IntTable do
+				if IntTable[i] then IntTable[i]:Hide() end
+			end
+			wipe(IntTable)
 		end
-	elseif msg:lower() == "reset" then
-		wipe(NDuiDB["AuraWatch"])
-		ReloadUI()
-	else
-		print("|cff70C0F5------------------------")
-		print("|cff0080ffAuraWatch |cff70C0F5"..COMMAND..":")
-		print("|c0000ff00/aw move |cff70C0F5"..UNLOCK)
-		print("|c0000ff00/aw lock |cff70C0F5"..LOCK)
-		print("|c0000ff00/aw reset |cff70C0F5"..RESET)
-		print("|cff70C0F5------------------------")
 	end
 end
-SLASH_AuraWatch1 = "/aw"

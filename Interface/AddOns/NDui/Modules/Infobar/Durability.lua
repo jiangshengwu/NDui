@@ -1,7 +1,8 @@
-local B, C, L, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 if not C.Infobar.Durability then return end
 
-local module = NDui:GetModule("Infobar")
+local module = B:GetModule("Infobar")
 local info = module:RegisterInfobar(C.Infobar.DurabilityPos)
 
 local localSlots = {
@@ -22,21 +23,7 @@ inform:SetPoint("BOTTOM", info, "TOP", 0, 23)
 inform.Text:SetText(L["Low Durability"])
 inform:Hide()
 
-local function gradientColor(perc)
-	perc = perc > 1 and 1 or perc < 0 and 0 or perc -- Stay between 0-1
-	local seg, relperc = math.modf(perc*2)
-	local r1, g1, b1, r2, g2, b2 = select(seg*3+1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0) -- R -> Y -> G
-	local r, g, b = r1+(r2-r1)*relperc, g1+(g2-g1)*relperc, b1+(b2-b1)*relperc
-	return format("|cff%02x%02x%02x", r*255, g*255, b*255), r, g, b
-end
-
-info.eventList = {
-	"UPDATE_INVENTORY_DURABILITY", "PLAYER_ENTERING_WORLD",
-}
-
-info.onEvent = function(self)
-	if not NDuiADB["RepairType"] then NDuiADB["RepairType"] = 1 end
-
+local function getItemDurability()
 	local numSlots = 0
 	for i = 1, 10 do
 		if GetInventoryItemLink("player", localSlots[i][1]) then
@@ -51,22 +38,59 @@ info.onEvent = function(self)
 	end
 	sort(localSlots, function(a, b) return a[3] < b[3] end)
 
+	return numSlots
+end
+
+local function isLowDurability()
 	for i = 1, 10 do
 		if localSlots[i][3] < .25 then
-			inform:Show()
-			break
+			return true
 		end
-	end
-
-	if numSlots > 0 then
-		self.text:SetText(format(gsub("[color]%d|r%%"..L["D"], "%[color%]", (gradientColor(floor(localSlots[1][3]*100)/100))), floor(localSlots[1][3]*100)))
-	else
-		self.text:SetText(L["D"]..": "..DB.MyColor..NONE)
 	end
 end
 
-info.onMouseUp = function(self, button)
-	if button == "RightButton" then
+local function gradientColor(perc)
+	perc = perc > 1 and 1 or perc < 0 and 0 or perc -- Stay between 0-1
+	local seg, relperc = math.modf(perc*2)
+	local r1, g1, b1, r2, g2, b2 = select(seg*3+1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0) -- R -> Y -> G
+	local r, g, b = r1+(r2-r1)*relperc, g1+(g2-g1)*relperc, b1+(b2-b1)*relperc
+	return format("|cff%02x%02x%02x", r*255, g*255, b*255), r, g, b
+end
+
+info.eventList = {
+	"UPDATE_INVENTORY_DURABILITY", "PLAYER_ENTERING_WORLD",
+}
+
+info.onEvent = function(self, event)
+	self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+	if not NDuiADB["RepairType"] then NDuiADB["RepairType"] = 1 end
+
+	if event == "PLAYER_REGEN_ENABLED" then
+		self:UnregisterEvent(event)
+		self:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
+		getItemDurability()
+		if isLowDurability() then inform:Show() end
+	else
+		local numSlots = getItemDurability()
+		if numSlots > 0 then
+			self.text:SetText(format(gsub("[color]%d|r%%"..L["D"], "%[color%]", (gradientColor(floor(localSlots[1][3]*100)/100))), floor(localSlots[1][3]*100)))
+		else
+			self.text:SetText(L["D"]..": "..DB.MyColor..NONE)
+		end
+
+		if isLowDurability() then inform:Show() else inform:Hide() end
+	end
+end
+
+inform.CloseButton:HookScript("OnClick", function()
+	if InCombatLockdown() then
+		info:UnregisterEvent("UPDATE_INVENTORY_DURABILITY")
+		info:RegisterEvent("PLAYER_REGEN_ENABLED")
+	end
+end)
+
+info.onMouseUp = function(self, btn)
+	if btn == "RightButton" then
 		NDuiADB["RepairType"] = NDuiADB["RepairType"] + 1
 		if NDuiADB["RepairType"] == 3 then NDuiADB["RepairType"] = 0 end
 		self:GetScript("OnEnter")(self)
@@ -93,46 +117,69 @@ info.onEnter = function(self)
 			local green = localSlots[i][3]*2
 			local red = 1 - green
 			local slotIcon = "|T"..GetInventoryItemTexture("player", localSlots[i][1])..":13:15:0:0:50:50:4:46:4:46|t " or ""
-			GameTooltip:AddDoubleLine(slotIcon..localSlots[i][2]..":", floor(localSlots[i][3]*100).."%", 1,1,1, red+1,green,0)
+			GameTooltip:AddDoubleLine(slotIcon..localSlots[i][2], floor(localSlots[i][3]*100).."%", 1,1,1, red+1,green,0)
 		end
 	end
 
-	GameTooltip:AddDoubleLine(" ", "--------------", 1,1,1, .5,.5,.5)
-	GameTooltip:AddDoubleLine(" ", DB.LeftButton..L["PlayerPanel"], 1,1,1, .6,.8,1)
-	GameTooltip:AddDoubleLine(" ", DB.RightButton..L["AutoRepair"]..": "..repairlist[NDuiADB["RepairType"]], 1,1,1, .6,.8,1)
+	GameTooltip:AddDoubleLine(" ", DB.LineString)
+	GameTooltip:AddDoubleLine(" ", DB.LeftButton..L["Player Panel"].." ", 1,1,1, .6,.8,1)
+	GameTooltip:AddDoubleLine(" ", DB.RightButton..L["Auto Repair"]..": "..repairlist[NDuiADB["RepairType"]].." ", 1,1,1, .6,.8,1)
 	GameTooltip:Show()
 end
 
 info.onLeave = function() GameTooltip:Hide() end
 
 -- Auto repair
-NDui:EventFrame("MERCHANT_SHOW"):SetScript("OnEvent", function()
-	if NDuiADB["RepairType"] ~= 0 and CanMerchantRepair() then
-		local cost = GetRepairAllCost()
-		if cost > 0 then
-			local money = GetMoney()
-			if IsInGuild() and NDuiADB["RepairType"] == 1 then
-				local guildMoney = GetGuildBankWithdrawMoney()
-				if guildMoney > GetGuildBankMoney() then
-					guildMoney = GetGuildBankMoney()
-				end
-				if guildMoney >= cost and CanGuildBankRepair() then
-					RepairAllItems(1)
-					print(format("|cff99CCFF"..L["Repair cost covered by G-Bank"]..":|r %s", GetMoneyString(cost)))
-					return
-				elseif guildMoney == 0 and IsGuildLeader() then
-					RepairAllItems(1)
-					print(format("|cff99CCFF"..L["Repair cost covered by G-Bank"]..":|r %s", GetMoneyString(cost)))
-					return
-				end
-			end
+local isShown, isBankEmpty
 
-			if money > cost then
+local function autoRepair(override)
+	if isShown and not override then return end
+	isShown = true
+	isBankEmpty = false
+
+	local repairAllCost, canRepair = GetRepairAllCost()
+	local myMoney = GetMoney()
+
+	if canRepair and repairAllCost > 0 then
+		if (not override) and NDuiADB["RepairType"] == 1 and IsInGuild() and CanGuildBankRepair() and GetGuildBankWithdrawMoney() >= repairAllCost then
+			RepairAllItems(true)
+		else
+			if myMoney > repairAllCost then
 				RepairAllItems()
-				print(format("|cff99CCFF"..L["Repair cost"]..":|r %s", GetMoneyString(cost)))
+				print(format(DB.InfoColor.."%s:|r %s", L["Repair cost"], GetMoneyString(repairAllCost)))
+				return
 			else
-				print("|cff99CCFF"..L["Go farm newbie"].."|r")
+				print(DB.InfoColor..L["Repair error"])
+				return
 			end
 		end
+
+		C_Timer.After(.5, function()
+			if isBankEmpty then
+				autoRepair(true)
+			else
+				print(format(DB.InfoColor.."%s:|r %s", L["Guild repair"], GetMoneyString(repairAllCost)))
+			end
+		end)
 	end
-end)
+end
+
+local function checkBankFund(_, msgType)
+	if msgType == LE_GAME_ERR_GUILD_NOT_ENOUGH_MONEY then
+		isBankEmpty = true
+	end
+end
+
+local function merchantClose()
+	isShown = false
+	B:UnregisterEvent("UI_ERROR_MESSAGE", checkBankFund)
+	B:UnregisterEvent("MERCHANT_CLOSED", merchantClose)
+end
+
+local function merchantShow()
+	if IsShiftKeyDown() or NDuiADB["RepairType"] == 0 or not CanMerchantRepair() then return end
+	autoRepair()
+	B:RegisterEvent("UI_ERROR_MESSAGE", checkBankFund)
+	B:RegisterEvent("MERCHANT_CLOSED", merchantClose)
+end
+B:RegisterEvent("MERCHANT_SHOW", merchantShow)

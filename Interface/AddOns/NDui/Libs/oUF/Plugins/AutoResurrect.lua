@@ -2,9 +2,9 @@
 -- FreebAutoRez, by Freebaser
 -- NDui MOD
 --------------------------------
-local B, C, L, DB = unpack(select(2, ...))
 local _, ns = ...
-local oUF = ns.oUF
+local B, C, L, DB = unpack(ns)
+local oUF = ns.oUF or oUF
 
 local classList = {
 	["DEATHKNIGHT"] = {
@@ -26,8 +26,16 @@ local classList = {
 	["SHAMAN"] = {
 		ooc = GetSpellInfo(2008),		-- Ancestral Spirit
 	},
-	["HUNTER"] = {},
-	["WARLOCK"] = {},
+	["WARLOCK"] = {
+		combat = GetSpellInfo(20707),	-- Soulstone
+	},
+	--["HUNTER"] = {},	-- blz has removed hunter res
+}
+
+local hunterRes = {
+	[1] = GetSpellInfo(126393),			-- Eternal Guardian
+	[2] = GetSpellInfo(159931),			-- Gift of Chiji
+	[3] = GetSpellInfo(159956),			-- Dust of Life
 }
 
 local body = ""
@@ -35,24 +43,21 @@ local function macroBody(class)
 	body = "/stopmacro [@mouseover,nodead]\n"
 
 	if class == "HUNTER" then
-		local res1 = GetSpellInfo(126393)	--魁麟
-		local res2 = GetSpellInfo(159931)	--鹤
-		local res3 = GetSpellInfo(159956)	--蛾
-		body = body.."/cast [@mouseover,help,dead]"..res1.."\n/cast [@mouseover,help,dead]"..res2.."\n/cast [@mouseover,help,dead]"..res3.."; "
-	elseif class == "WARLOCK" then
-		local name = GetSpellInfo(20707)	--灵魂石
-		body = body.."/cast [@mouseover,help,dead] "..name.."; "
+		for i = 1, #hunterRes do
+			body = body.."/cast [@mouseover,help,dead]"..hunterRes[i].."\n"
+		end
 	else
-		local combatspell = classList[class].combat
-		local oocspell = classList[class].ooc
-		if combatspell then
-			body = body.."/cast [combat,@mouseover,help,dead] "..combatspell.."; "
-
-			if oocspell then
-				body = body.."[@mouseover,help,dead] "..oocspell.."; "
+		local combatSpell = classList[class].combat
+		local oocSpell = classList[class].ooc
+		if combatSpell then
+			if oocSpell then
+				body = body.."/cast [combat,@mouseover,help,dead] "..combatSpell.."; "
+				body = body.."[@mouseover,help,dead] "..oocSpell
+			else
+				body = body.."/cast [@mouseover,help,dead] "..combatSpell
 			end
-		elseif oocspell then
-			body = body.."/cast [@mouseover,help,dead] "..oocspell.."; "
+		elseif oocSpell then
+			body = body.."/cast [@mouseover,help,dead] "..oocSpell
 		end
 	end
 
@@ -65,7 +70,7 @@ local function setupAttribute(self)
 	if classList[DB.MyClass] and not IsAddOnLoaded("Clique") then
 		self:SetAttribute("*type3", "macro")
 		self:SetAttribute("macrotext3", macroBody(DB.MyClass))
-		self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+		self:UnregisterEvent("PLAYER_REGEN_ENABLED", setupAttribute)
 	end
 end
 
@@ -83,7 +88,7 @@ local Disable = function(self)
 	if NDuiDB["UFs"]["AutoRes"] then return end
 
 	self:SetAttribute("*type3", nil)
-	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	self:UnregisterEvent("PLAYER_REGEN_ENABLED", setupAttribute)
 end
 
 oUF:AddElement("AutoResurrect", nil, Enable, Disable)

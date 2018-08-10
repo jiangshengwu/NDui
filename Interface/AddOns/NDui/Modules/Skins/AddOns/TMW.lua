@@ -1,9 +1,10 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Skins")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Skins")
 
 local function ReskinTMW()
-	TMW.Classes.Icon:PostHookMethod("OnNewInstance", function(self, icon)
-		B.CreateSD(self, 3, 3)
+	TMW.Classes.Icon:PostHookMethod("OnNewInstance", function(self)
+		B.CreateSD(self, 2, 2)
 	end)
 
 	TMW.Classes.IconModule_Texture:PostHookMethod("OnNewInstance", function(self)

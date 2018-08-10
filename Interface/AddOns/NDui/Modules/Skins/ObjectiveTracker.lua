@@ -1,5 +1,6 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Skins")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Skins")
 local r, g, b = DB.cc.r, DB.cc.g, DB.cc.b
 
 local tracker = ObjectiveTrackerFrame
@@ -39,45 +40,41 @@ function module:QuestTracker()
 			QuestMapQuestOptions_ShareQuest(id)
 		end
 	end
-	hooksecurefunc(QUEST_TRACKER_MODULE, "OnBlockHeaderClick", function(self, block) QuestHook(block.id) end)
+	hooksecurefunc(QUEST_TRACKER_MODULE, "OnBlockHeaderClick", function(_, block) QuestHook(block.id) end)
 	hooksecurefunc("QuestMapLogTitleButton_OnClick", function(self) QuestHook(self.questID) end)
 
 	-- Show quest color and level
-	local function Showlevel()
+	local function Showlevel(_, _, _, title, level, _, isHeader, _, isComplete, frequency, questID)
 		if ENABLE_COLORBLIND_MODE == "1" then return end
-		local numEntries = GetNumQuestLogEntries()
-		local titleIndex = 1
-		for i = 1, numEntries do
-			local title, level, _, isHeader, _, isComplete, frequency, questID = GetQuestLogTitle(i)
-			local titleButton = QuestLogQuests_GetTitleButton(titleIndex)
-			if title and (not isHeader) and titleButton.questID == questID then
-				titleButton.Check:SetPoint("LEFT", titleButton.Text, titleButton.Text:GetWrappedWidth() + 2, 0)
-				titleIndex = titleIndex + 1
-				local text = "["..level.."] "..title
+
+		for button in pairs(QuestScrollFrame.titleFramePool.activeObjects) do
+			if title and not isHeader and button.questID == questID then
+				local title = "["..level.."] "..title
 				if isComplete then
-					text = "|cffff78ff"..text
+					title = "|cffff78ff"..title
 				elseif frequency == LE_QUEST_FREQUENCY_DAILY then
-					text = "|cff3399ff"..text
+					title = "|cff3399ff"..title
 				end
-				titleButton.Text:SetText(text)
-				titleButton.Text:SetPoint("TOPLEFT", 24, -5)
-				titleButton.Text:SetWidth(216)
-				titleButton.Text:SetWordWrap(false)
+				button.Text:SetText(title)
+				button.Text:SetPoint("TOPLEFT", 24, -5)
+				button.Text:SetWidth(205)
+				button.Text:SetWordWrap(false)
+				button.Check:SetPoint("LEFT", button.Text, button.Text:GetWrappedWidth(), 0)
 			end
 		end
 	end
-	hooksecurefunc("QuestLogQuests_Update", Showlevel)
+	hooksecurefunc("QuestLogQuests_AddQuestButton", Showlevel)
 
 	-- ObjectiveTracker Skin
 	if not NDuiDB["Skins"]["TrackerSkin"] then return end
 
 	-- Reskin QuestIcons
-	local function reskinQuestIcon(self, block)
+	local function reskinQuestIcon(_, block)
 		local itemButton = block.itemButton
 		if itemButton and not itemButton.styled then
 			itemButton:SetNormalTexture("")
 			itemButton:SetPushedTexture("")
-			itemButton:GetHighlightTexture():SetColorTexture(1, 1, 1, .3)
+			itemButton:GetHighlightTexture():SetColorTexture(1, 1, 1, .25)
 			itemButton.icon:SetTexCoord(unpack(DB.TexCoord))
 			B.CreateSD(itemButton, 3, 3)
 
@@ -88,7 +85,7 @@ function module:QuestTracker()
 		if rightButton and not rightButton.styled then
 			rightButton:SetNormalTexture("")
 			rightButton:SetPushedTexture("")
-			rightButton:GetHighlightTexture():SetColorTexture(1, 1, 1, .3)
+			rightButton:GetHighlightTexture():SetColorTexture(1, 1, 1, .25)
 			local bg = B.CreateBG(rightButton, 3)
 			B.CreateBD(bg)
 			rightButton:SetSize(22, 22)
@@ -123,7 +120,7 @@ function module:QuestTracker()
 	for _, header in pairs(headers) do reskinHeader(header) end
 
 	-- Reskin Progressbars
-	local function reskinProgressbar(self, block, line)
+	local function reskinProgressbar(_, _, line)
 		local progressBar = line.ProgressBar
 		local bar = progressBar.Bar
 		local icon = bar.Icon
@@ -135,16 +132,18 @@ function module:QuestTracker()
 			bar.BarBG:Hide()
 			bar.BarGlow:Hide()
 			bar.IconBG:SetTexture("")
+			BonusObjectiveTrackerProgressBar_PlayFlareAnim = B.Dummy
 
 			bar:SetPoint("LEFT", 22, 0)
 			bar:SetStatusBarTexture(DB.normTex)
 			bar:SetStatusBarColor(r*.8, g*.8, b*.8)
-			local bg = B.CreateBG(bar, 3)
+			B.SmoothBar(bar)
+
+			local bg = B.CreateBG(progressBar)
+			bg:SetPoint("TOPLEFT", bar, -3, 3)
+			bg:SetPoint("BOTTOMRIGHT", bar, 3, -3)
 			B.CreateBD(bg)
 			B.CreateTex(bg)
-			if bar.AnimIn then	-- Fix bg opacity
-				bar.AnimIn:HookScript("OnFinished", function() bg:SetBackdropColor(0, 0, 0, .5) end)
-			end
 
 			icon:SetMask(nil)
 			icon:SetTexCoord(unpack(DB.TexCoord))
@@ -162,13 +161,14 @@ function module:QuestTracker()
 	hooksecurefunc(WORLD_QUEST_TRACKER_MODULE, "AddProgressBar", reskinProgressbar)
 	hooksecurefunc(SCENARIO_TRACKER_MODULE, "AddProgressBar", reskinProgressbar)
 
-	hooksecurefunc(QUEST_TRACKER_MODULE, "AddProgressBar", function(self, block, line)
+	hooksecurefunc(QUEST_TRACKER_MODULE, "AddProgressBar", function(_, _, line)
 		local progressBar = line.ProgressBar
 		local bar = progressBar.Bar
 
 		if not bar.styled then
 			bar:ClearAllPoints()
 			bar:SetPoint("LEFT")
+			B.SmoothBar(bar)
 			for i = 1, 6 do
 				select(i, bar:GetRegions()):Hide()
 			end
@@ -210,13 +210,14 @@ function module:QuestTracker()
 			select(3, block:GetRegions()):Hide()
 			block.bg = B.CreateBG(block)
 			block.bg:SetPoint("TOPLEFT", 2, 0)
+			block.bg:SetPoint("BOTTOMRIGHT", -2, 0)
 			B.CreateBD(block.bg)
 			B.CreateTex(block.bg)
 		end
 	end)
 
 	hooksecurefunc("Scenario_ChallengeMode_SetUpAffixes", function(block)
-		for i, frame in ipairs(block.Affixes) do
+		for _, frame in ipairs(block.Affixes) do
 			frame.Border:Hide()
 			frame.Portrait:SetTexture(nil)
 			frame.Portrait:SetTexCoord(unpack(DB.TexCoord))
@@ -232,12 +233,12 @@ function module:QuestTracker()
 	end)
 
 	-- Minimize Button
-	if IsAddOnLoaded("Aurora") then
-		local F = unpack(Aurora)
+	if IsAddOnLoaded("AuroraClassic") then
+		local F = unpack(AuroraClassic)
 		F.ReskinExpandOrCollapse(minimize)
-		minimize:SetSize(18, 18)
-		minimize.plus:Hide()
-		hooksecurefunc("ObjectiveTracker_Collapse", function() minimize.plus:Show() end)
-		hooksecurefunc("ObjectiveTracker_Expand", function() minimize.plus:Hide() end)
+		minimize:GetNormalTexture():SetAlpha(0)
+		minimize.expTex:SetTexCoord(0.5625, 1, 0, 0.4375)
+		hooksecurefunc("ObjectiveTracker_Collapse", function() minimize.expTex:SetTexCoord(0, 0.4375, 0, 0.4375) end)
+		hooksecurefunc("ObjectiveTracker_Expand", function() minimize.expTex:SetTexCoord(0.5625, 1, 0, 0.4375) end)
 	end
 end

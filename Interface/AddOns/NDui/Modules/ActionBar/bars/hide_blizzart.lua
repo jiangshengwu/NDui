@@ -1,8 +1,6 @@
-local B, C, L, DB = unpack(select(2, ...))
-local Bar = NDui:GetModule("Actionbar")
-
-local hiddenFrame = CreateFrame("Frame")
-hiddenFrame:Hide()
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local Bar = B:GetModule("Actionbar")
 
 local scripts = {
 	"OnShow", "OnHide", "OnEvent", "OnEnter", "OnLeave", "OnUpdate", "OnValueChanged", "OnClick", "OnMouseDown", "OnMouseUp",
@@ -14,26 +12,26 @@ local framesToHide = {
 
 local framesToDisable = {
 	MainMenuBar,
-	ActionBarDownButton, ActionBarUpButton, MainMenuBarVehicleLeaveButton, ExhaustionTick,
-	ReputationWatchBar, ArtifactWatchBar, HonorWatchBar, MainMenuExpBar, MainMenuBarMaxLevelBar,
+	MicroButtonAndBagsBar, MainMenuBarArtFrame, StatusTrackingBarManager,
+	ActionBarDownButton, ActionBarUpButton, MainMenuBarVehicleLeaveButton,
 	OverrideActionBar,
 	OverrideActionBarExpBar, OverrideActionBarHealthBar, OverrideActionBarPowerBar, OverrideActionBarPitchFrame,
 }
 
 local function DisableAllScripts(frame)
-	for i, script in next, scripts do
+	for _, script in next, scripts do
 		if frame:HasScript(script) then
-			frame:SetScript(script,nil)
+			frame:SetScript(script, nil)
 		end
 	end
 end
 
 function Bar:HideBlizz()
-	for i, frame in next, framesToHide do
-		frame:SetParent(hiddenFrame)
+	for _, frame in next, framesToHide do
+		frame:SetParent(B.HiddenFrame)
 	end
 
-	for i, frame in next, framesToDisable do
+	for _, frame in next, framesToDisable do
 		frame:UnregisterAllEvents()
 		DisableAllScripts(frame)
 	end

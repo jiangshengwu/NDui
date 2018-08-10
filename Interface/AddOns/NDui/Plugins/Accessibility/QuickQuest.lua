@@ -1,13 +1,13 @@
-local B, C, L, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 --------------------------
 -- QuickQuest, by P3lim
 -- NDui MOD
 --------------------------
-local WorldMapTitleButton = _G.WorldMapTitleButton
-local mono = CreateFrame("CheckButton", nil, WorldMapTitleButton, "OptionsCheckButtonTemplate")
-mono:SetPoint("TOPRIGHT", WorldMapTitleButton, -100, -2)
+local mono = CreateFrame("CheckButton", nil, WorldMapFrame.BorderFrame, "OptionsCheckButtonTemplate")
+mono:SetPoint("TOPRIGHT", -140, 0)
 mono:SetSize(26, 26)
-B.CreateCB(mono)
+B.CreateCB(mono, .25)
 mono.text = B.CreateFS(mono, 14, L["Auto Quest"], false, "LEFT", 25, 0)
 mono:RegisterEvent("PLAYER_LOGIN")
 mono:SetScript("OnEvent", function(self)
@@ -21,7 +21,7 @@ end)
 local QuickQuest = CreateFrame("Frame")
 QuickQuest:SetScript("OnEvent", function(self, event, ...) self[event](...) end)
 
-local choiceQueue
+local quests, choiceQueue = {}
 
 function QuickQuest:Register(event, func)
 	self:RegisterEvent(event)
@@ -58,7 +58,6 @@ local ignoreQuestNPC = {
 	[108868] = true,	-- Hunter's order hall
 	[101462] = true,	-- Reaves
 	[43929] = true,		-- 4000
-	[106655] = true,	-- Legendary Item Upgrade
 	[14847] = true,		-- DarkMoon
 	[119388] = true,	-- 酋长哈顿
 	[114719] = true,	-- 商人塞林
@@ -66,10 +65,13 @@ local ignoreQuestNPC = {
 	[126954] = true,	-- 图拉扬
 	[124312] = true,	-- 图拉扬
 	[103792] = true,	-- 格里伏塔
+	[101880] = true,	-- 泰克泰克
+	[141584] = true,	-- 祖尔温
 }
 
 local function GetQuestLogQuests(onlyComplete)
-	local quests = {}
+	wipe(quests)
+
 	for index = 1, GetNumQuestLogEntries() do
 		local title, _, _, isHeader, _, isComplete, _, questID = GetQuestLogTitle(index)
 		if(not isHeader) then
@@ -244,7 +246,7 @@ end)
 
 QuickQuest:Register("QUEST_ACCEPT_CONFIRM", AcceptQuest)
 
-QuickQuest:Register("QUEST_ACCEPTED", function(id)
+QuickQuest:Register("QUEST_ACCEPTED", function()
 	if(QuestFrame:IsShown() and QuestGetAutoAccept()) then
 		CloseQuest()
 	end
@@ -314,8 +316,8 @@ local itemBlacklist = {
 
 QuickQuest:Register("QUEST_PROGRESS", function()
 	if(IsQuestCompletable()) then
-		local _, _, worldQuest = GetQuestTagInfo(GetQuestID())
-		if worldQuest then return end
+		local id, _, worldQuest = GetQuestTagInfo(GetQuestID())
+		if id == 153 or worldQuest then return end
 		-- 阿古斯的随从兑换
 		if GetNPCID() == 119388 or GetNPCID() == 127037 or GetNPCID() == 126954 or GetNPCID() == 124312 then return end
 

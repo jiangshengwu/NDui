@@ -1,79 +1,63 @@
-local B, C, L, DB = unpack(select(2, ...))
-if DB.MyClass ~= "SHAMAN" then return end
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Auras")
 
 -- Style
-local Totembar, totem, debugCheck = CreateFrame("Frame", nil, UIParent), {}
+local totem = {}
 local icons = {
-	[1] = 120217, -- Fire
-	[2] = 120218, -- Earth
-	[3] = 120214, -- Water
-	[4] = 120219, -- Air
+	[1] = GetSpellTexture(120217), -- Fire
+	[2] = GetSpellTexture(120218), -- Earth
+	[3] = GetSpellTexture(120214), -- Water
+	[4] = GetSpellTexture(120219), -- Air
 }
 
 local function TotemsGo()
+	local Totembar = CreateFrame("Frame", nil, UIParent)
 	Totembar:SetSize(C.Auras.IconSize, C.Auras.IconSize)
 	for i = 1, 4 do
-		totem[i] = CreateFrame("Button", nil, Totembar, "SecureActionButtonTemplate")
+		totem[i] = CreateFrame("Button", nil, Totembar)
 		totem[i]:SetSize(C.Auras.IconSize, C.Auras.IconSize)
 		if i == 1 then
 			totem[i]:SetPoint("CENTER", Totembar)
 		else
 			totem[i]:SetPoint("LEFT", totem[i-1], "RIGHT", 5, 0)
 		end
-		B.CreateIF(totem[i], true)
-		totem[i].Icon:SetTexture(GetSpellTexture(icons[i]))
-		totem[i]:SetAlpha(.3)
-		if NDuiDB["Auras"]["DestroyTotems"] then
-			totem[i]:SetAttribute("type", "macro")
-			totem[i]:SetAttribute("macrotext", "/click TotemFrameTotem"..SHAMAN_TOTEM_PRIORITIES[i].." RightButton")
-		end
+		B.CreateIF(totem[i], false, true)
+		totem[i].Icon:SetTexture(icons[i])
+		totem[i]:SetAlpha(.2)
+
+		local defaultTotem = _G["TotemFrameTotem"..i]
+		defaultTotem:SetParent(totem[i])
+		defaultTotem:SetAllPoints()
+		defaultTotem:SetAlpha(0)
+		totem[i].parent = defaultTotem
 	end
 	B.Mover(Totembar, L["Totembar"], "Totems", C.Auras.TotemsPos, 140, 32)
 end
 
--- Function
-local f = NDui:EventFrame({"PLAYER_ENTERING_WORLD", "PLAYER_TOTEM_UPDATE"})
-f:SetScript("OnEvent", function(self)
-	if not NDuiDB["Auras"]["Totems"] then
-		self:UnregisterAllEvents()
-		return
-	end
-	if not self.styled then
-		TotemsGo()
-		self.styled = true
-	end
-	if self.styled then
-		for slot = 1, 4 do
-			local haveTotem, name, start, dur, icon = GetTotemInfo(slot)
-			local id = select(7, GetSpellInfo(name))
-			local Totem = totem[slot]
-			if haveTotem and dur > 0 then
-				Totem:SetAlpha(1)
-				Totem.Icon:SetTexture(icon)
-				Totem.CD:SetCooldown(start, dur)
-			else
-				Totem:SetAlpha(.3)
-				Totem.Icon:SetTexture(GetSpellTexture(icons[slot]))
-				Totem.CD:SetCooldown(0, 0)
-			end
+local function updateTotem()
+	for i = 1, 4 do
+		local totem = totem[i]
+		local defaultTotem = totem.parent
+		local slot = defaultTotem.slot
 
-			Totem:SetScript("OnEnter", function(self)
-				if not id then return end
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
-				GameTooltip:ClearLines()
-				GameTooltip:SetSpellByID(id)
-				GameTooltip:Show()
-			end)
-			Totem:SetScript("OnLeave", GameTooltip_Hide)
-
-			Totem:SetScript("OnUpdate", function(self, elapsed)
-				local Time = start + dur - GetTime()
-				if Time > 0 and Time < .8 then
-					ActionButton_ShowOverlayGlow(Totem)
-				else
-					ActionButton_HideOverlayGlow(Totem)
-				end
-			end)
+		local haveTotem, _, start, dur, icon = GetTotemInfo(slot)
+		if haveTotem and dur > 0 then
+			totem.Icon:SetTexture(icon)
+			totem.CD:SetCooldown(start, dur)
+			totem.CD:Show()
+			totem:SetAlpha(1)
+		else
+			totem:SetAlpha(.2)
+			totem.Icon:SetTexture(icons[i])
+			totem.CD:Hide()
 		end
 	end
-end)
+end
+
+function module:Totems()
+	if not NDuiDB["Auras"]["Totems"] then return end
+
+	TotemsGo()
+	B:RegisterEvent("PLAYER_TOTEM_UPDATE", updateTotem)
+end

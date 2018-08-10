@@ -1,9 +1,14 @@
-local B, C, L, DB = unpack(select(2, ...))
-local module = NDui:GetModule("Skins")
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
+local module = B:GetModule("Skins")
 
 function module:FontStyle()
-	if not IsAddOnLoaded("Aurora") then return end
 	if not NDuiDB["Skins"]["FontFlag"] then return end
+
+	if not IsAddOnLoaded("AuroraClassic") then return end
+	AuroraOptionsenableFont:Disable()
+	AuroraOptionsenableFont.Text:SetTextColor(.5, .5, .5)
+	AuroraConfig.enableFont = false
 
 	local function ReskinFont(font, size, white)
 		font:SetFont(DB.Font[1], size, white and "" or "OUTLINE")
@@ -75,13 +80,19 @@ function module:FontStyle()
 	ReskinFont(Tooltip_Med, 13)
 	ReskinFont(Tooltip_Small, 12)
 	ReskinFont(HelpFrameKnowledgebaseNavBarHomeButtonText, 15)
-	ReskinFont(WorldMapFrameNavBarHomeButtonText, 15)
+	ReskinFont(Game12Font, 12)
+	ReskinFont(Game16Font, 16)
 	ReskinFont(Game18Font, 18)
+	ReskinFont(Game20Font, 20)
+	ReskinFont(Game24Font, 24)
+	ReskinFont(Game27Font, 27)
+	ReskinFont(Game30Font, 30)
 	ReskinFont(Game32Font, 32)
 	ReskinFont(System_IME, 16)
 	ReskinFont(Fancy24Font, 24)
 	ReskinFont(SplashHeaderFont, 24)
 	ReskinFont(ChatBubbleFont, 13)
+	ReskinFont(GameFontNormalHuge2, 24)
 
 	-- Refont RaidFrame Health
 	hooksecurefunc("CompactUnitFrame_UpdateStatusText", function(frame)
@@ -93,7 +104,7 @@ function module:FontStyle()
 		frame.statusText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, options.height/3 - 5)
 
 		if not frame.fontStyled then
-			local fontName, fontSize, fontFlags = frame.statusText:GetFont()
+			local fontName, fontSize = frame.statusText:GetFont()
 			frame.statusText:SetFont(fontName, fontSize, "OUTLINE")
 			frame.statusText:SetTextColor(.7, .7, .7)
 			frame.statusText:SetShadowColor(0, 0, 0, 0)
@@ -112,9 +123,8 @@ function module:FontStyle()
 		end
 	end)
 
-	-- Achievement ShieldPoints, GuildRoster LevelText
-	local styledIndex = 0
-	NDui:EventFrame("ADDON_LOADED"):SetScript("OnEvent", function(self, event, addon)
+	-- Achievement ShieldPoints
+	local function updateAchievement(event, addon)
 		if addon == "Blizzard_AchievementUI" then
 			hooksecurefunc("AchievementObjectives_DisplayProgressiveAchievement", function()
 				local index = 1
@@ -132,9 +142,15 @@ function module:FontStyle()
 				end
 			end)
 
-			styledIndex = styledIndex + 1
-		elseif addon == "Blizzard_GuildUI" then
-			hooksecurefunc("GuildRoster_SetView", function(view)
+			B:UnregisterEvent(event, updateAchievement)
+		end
+	end
+	B:RegisterEvent("ADDON_LOADED", updateAchievement)
+
+	-- GuildRoster LevelText
+	local function updateGuildString(event, addon)
+		if addon == "Blizzard_GuildUI" then
+			local function updateLevelString(view)
 				if view == "playerStatus" or view == "reputation" or view == "achievement" then
 					local buttons = GuildRosterContainer.buttons
 					for i = 1, #buttons do
@@ -151,14 +167,21 @@ function module:FontStyle()
 						end
 					end
 				end
+			end
+
+			local done
+			GuildRosterContainer:HookScript("OnShow", function()
+				if not done then
+					updateLevelString(GetCVar("guildRosterView"))
+					done = true
+				end
 			end)
-			GuildRoster_SetView(GetCVar("guildRosterView"))
+			hooksecurefunc("GuildRoster_SetView", updateLevelString)
 
-			styledIndex = styledIndex + 1
+			B:UnregisterEvent(event, updateGuildString)
 		end
-
-		if styledIndex == 2 then self:UnregisterAllEvents() end
-	end)
+	end
+	B:RegisterEvent("ADDON_LOADED", updateGuildString)
 
 	-- WhoFrame LevelText
 	hooksecurefunc("WhoList_Update", function()

@@ -1,4 +1,5 @@
-local B, C, _, DB = unpack(select(2, ...))
+local _, ns = ...
+local B, C, L, DB = unpack(ns)
 
 --[[
 	NDui DevTools:
@@ -11,13 +12,18 @@ local B, C, _, DB = unpack(select(2, ...))
 	/getnpc, get npc name and id
 ]]
 
-C.Debug = function()
-	if UnitName("player") ~= "寧德" then return end
-	print("pass")
+local dev = {"寧德", "Hunnie"}
+local function isDeveloper()
+	for _, name in pairs(dev) do
+		if UnitName("player") == name then
+			return true
+		end
+	end
 end
+DB.isDeveloper = isDeveloper()
 
 -- Commands
-SlashCmdList["RELOADUI"] = function() ReloadUI() end
+SlashCmdList["RELOADUI"] = ReloadUI
 SLASH_RELOADUI1 = "/rl"
 
 SlashCmdList["NDUI_ENUMTIP"] = function()
@@ -62,9 +68,9 @@ SLASH_INSTANCEID1 = "/getid"
 
 SlashCmdList["NDUI_NPCID"] = function()
 	local npcName = UnitName("target")
-	local npcGuid = UnitGUID("target") or nil
+	local npcGuid = UnitGUID("target")
 	if npcName and npcGuid then
-		local _, _, _, _, _, npcID = strsplit("-", npcGuid)
+		local npcID = select(6, strsplit("-", npcGuid))
 		print(npcName, DB.InfoColor..(npcID or "nil"))
 	end
 end
@@ -83,6 +89,49 @@ SlashCmdList["NDUI_DEV"] = function()
 	DeveloperConsole:Toggle()
 end
 SLASH_NDUI_DEV1 = "/ndev"
+
+do
+	local versionList = {}
+	C_ChatInfo.RegisterAddonMessagePrefix("NDuiFVC")
+
+	local function SendVerCheck(channel)
+		wipe(versionList)
+		C_ChatInfo.SendAddonMessage("NDuiFVC", "VersionCheck", channel)
+
+		C_Timer.After(3, function()
+			print("----------")
+			for name, version in pairs(versionList) do
+				print(name.." "..version)
+			end
+		end)
+	end
+
+	local function VerCheckListen(_, ...)
+		local prefix, msg, distType, sender = ...
+
+		if prefix == "NDuiFVC" then
+			if msg == "VersionCheck" then
+				C_ChatInfo.SendAddonMessage("NDuiFVC", "MyVer-"..DB.Version, distType)
+			elseif msg:find("MyVer") then
+				local _, version = string.split("-", msg)
+				versionList[sender] = version.." - "..distType
+			end
+		end
+	end
+	B:RegisterEvent("CHAT_MSG_ADDON", VerCheckListen)
+
+	SlashCmdList["NDUI_VER_CHECK"] = function()
+		if not DB.isDeveloper then return end
+		local channel
+		if IsInRaid() then
+			channel = "RAID"
+		elseif IsInGuild() then
+			channel = "GUILD"
+		end
+		if channel then SendVerCheck(channel) end
+	end
+	SLASH_NDUI_VER_CHECK1 = "/nduiver"
+end
 
 -- Grids
 local grid
@@ -136,27 +185,25 @@ end
 
 local function Grid_Show()
 	if not grid then
-        Grid_Create()
+		Grid_Create()
 	elseif grid.boxSize ~= boxSize then
-        grid:Hide()
-        Grid_Create()
-    else
+		grid:Hide()
+		Grid_Create()
+	else
 		grid:Show()
 	end
 end
 
 local isAligning = false
 SlashCmdList["TOGGLEGRID"] = function(arg)
-    if isAligning or arg == "1" then
-        if grid then
-			grid:Hide()
-		end
-        isAligning = false
-    else
-        boxSize = (math.ceil((tonumber(arg) or boxSize) / 32) * 32)
+	if isAligning or arg == "1" then
+		if grid then grid:Hide() end
+		isAligning = false
+	else
+		boxSize = (math.ceil((tonumber(arg) or boxSize) / 32) * 32)
 		if boxSize > 256 then boxSize = 256 end    
-        Grid_Show()
-        isAligning = true
-    end
+		Grid_Show()
+		isAligning = true
+	end
 end
 SLASH_TOGGLEGRID1 = "/ng"
